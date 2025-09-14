@@ -12,12 +12,12 @@ def main():
     st.markdown("**Monitoramento de conformidade operacional das vans da prefeitura**")
     
     # Carregar dados diretamente
-    df = DatabaseManager.get_dashboard_data()
-    if df.empty:
+    df_inicial = DatabaseManager.get_dashboard_data()
+    if df_inicial.empty:
         st.warning("⚠️ Não há dados carregados. Faça upload de arquivos CSV primeiro.")
         return
     else:
-        st.success(f"✅ Dados carregados: {len(df):,} registros para controle operacional")
+        st.success(f"✅ Dados carregados: {len(df_inicial):,} registros para controle operacional")
     
     # Sidebar com filtros
     with st.sidebar:
@@ -105,8 +105,8 @@ def main():
             help="Velocidades acima deste valor serão destacadas como picos"
         )
     
-    # Carregar dados com filtros
-    df = load_filtered_data(selected_client, selected_vehicle, start_date, end_date)
+    # Aplicar filtros aos dados já carregados
+    df = apply_filters_to_data(df_inicial, selected_client, selected_vehicle, start_date, end_date)
     
     # Aplicar filtros de horário se especificado
     if time_filter_mode != "Todos os horários" and not df.empty:
@@ -166,8 +166,44 @@ def get_vehicle_list(client_filter=None):
         st.error(f"Erro ao carregar veículos: {str(e)}")
         return []
 
+def apply_filters_to_data(df, client_filter, vehicle_filter, start_date, end_date):
+    """Aplica filtros aos dados já carregados"""
+    try:
+        if df.empty:
+            return df
+            
+        filtered_df = df.copy()
+        
+        # Filtro de cliente
+        if client_filter and client_filter != "Todos":
+            filtered_df = filtered_df[filtered_df['cliente'] == client_filter]
+        
+        # Filtro de veículo  
+        if vehicle_filter and vehicle_filter != "Todos":
+            filtered_df = filtered_df[filtered_df['placa'] == vehicle_filter]
+        
+        # Filtro de data
+        if 'data' in filtered_df.columns and not filtered_df.empty:
+            # Garantir que a coluna data é datetime
+            if not pd.api.types.is_datetime64_any_dtype(filtered_df['data']):
+                filtered_df['data'] = pd.to_datetime(filtered_df['data'], errors='coerce')
+            
+            start_datetime = datetime.combine(start_date, datetime.min.time())
+            end_datetime = datetime.combine(end_date, datetime.max.time())
+            
+            # Aplicar filtros de data
+            filtered_df = filtered_df[
+                (filtered_df['data'] >= start_datetime) & 
+                (filtered_df['data'] <= end_datetime)
+            ]
+        
+        return filtered_df
+    except Exception as e:
+        st.error(f"Erro ao aplicar filtros: {str(e)}")
+        return pd.DataFrame()
+
 def load_filtered_data(client_filter, vehicle_filter, start_date, end_date):
-    """Carrega dados filtrados"""
+    """Função mantida para compatibilidade - Carrega dados filtrados"""
     try:
         client_f = None if client_filter == "Todos" else client_filter
         vehicle_f = None if vehicle_filter == "Todos" else vehicle_filter

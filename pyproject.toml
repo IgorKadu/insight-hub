@@ -12,5 +12,7 @@ dependencies = [
     "reportlab>=4.4.3",
     "scikit-learn>=1.7.2",
     "sqlalchemy>=2.0.43",
+    "streamlit-folium>=0.25.1",
     "streamlit>=1.49.1",
+    "folium>=0.20.0",
 ]

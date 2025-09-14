@@ -20,25 +20,20 @@ class DataAnalyzer:
     def from_database(cls, cliente=None, placa=None, data_inicio=None, data_fim=None):
         """Cria uma instância do analisador usando dados da base de dados"""
         try:
-            # Verificar se há dados REAIS na base de dados
-            if not DatabaseManager.has_data():
-                # Sem fallbacks fictícios - apenas DataFrame vazio
-                print("⚠️ Nenhum dado real encontrado na base de dados")
-                df = pd.DataFrame(columns=[
-                    'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
-                    'gps', 'bloqueado', 'engine_hours_period'
-                ])
-            else:
-                # Buscar dados da base de dados com filtros
-                df = DatabaseManager.get_dashboard_data(
-                    client_filter=cliente if cliente != "Todos" else None,
-                    vehicle_filter=placa if placa != "Todos" else None,
-                    start_date=data_inicio,
-                    end_date=data_fim
-                )
+            # Buscar dados da base de dados com filtros
+            df = DatabaseManager.get_dashboard_data(
+                client_filter=cliente if cliente != "Todos" else None,
+                vehicle_filter=placa if placa != "Todos" else None,
+                start_date=data_inicio,
+                end_date=data_fim
+            )
+            
+            if not df.empty:
+                print(f"✅ DataAnalyzer: {len(df):,} registros carregados da base PostgreSQL")
             
             return cls(df)
         except Exception as e:
+            print(f"❌ Erro ao carregar dados: {str(e)}")
             # Em caso de erro, retornar analisador com DataFrame vazio
             empty_df = pd.DataFrame(columns=[
                 'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
@@ -56,25 +51,46 @@ class DataAnalyzer:
         if placa and placa != "Todos":
             filtered = filtered[filtered['placa'] == placa]
         
-        if data_inicio:
-            # Converter data_inicio para o mesmo timezone dos dados
-            if filtered['data'].dt.tz is not None:
-                # Dados têm timezone, converter data_inicio
-                data_inicio_tz = pd.Timestamp(data_inicio).tz_localize('UTC')
-            else:
-                # Dados sem timezone, usar timestamp simples
-                data_inicio_tz = pd.Timestamp(data_inicio)
-            filtered = filtered[filtered['data'] >= data_inicio_tz]
-        
-        if data_fim:
-            # Converter data_fim para o mesmo timezone dos dados
-            if filtered['data'].dt.tz is not None:
-                # Dados têm timezone, converter data_fim
-                data_fim_tz = pd.Timestamp(data_fim).tz_localize('UTC')
-            else:
-                # Dados sem timezone, usar timestamp simples
-                data_fim_tz = pd.Timestamp(data_fim)
-            filtered = filtered[filtered['data'] <= data_fim_tz]
+        # Verificar se há dados e se a coluna 'data' existe e é datetime
+        if not filtered.empty and 'data' in filtered.columns:
+            try:
+                # Garantir que a coluna 'data' é datetime
+                if not pd.api.types.is_datetime64_any_dtype(filtered['data']):
+                    filtered['data'] = pd.to_datetime(filtered['data'], errors='coerce')
+                
+                if data_inicio:
+                    # Converter data_inicio para o mesmo timezone dos dados
+                    try:
+                        if hasattr(filtered['data'].dtype, 'tz') and filtered['data'].dt.tz is not None:
+                            # Dados têm timezone, converter data_inicio
+                            data_inicio_tz = pd.Timestamp(data_inicio).tz_localize('UTC')
+                        else:
+                            # Dados sem timezone, usar timestamp simples
+                            data_inicio_tz = pd.Timestamp(data_inicio)
+                        filtered = filtered[filtered['data'] >= data_inicio_tz]
+                    except Exception:
+                        # Em caso de erro, usar comparação simples
+                        data_inicio_tz = pd.Timestamp(data_inicio)
+                        filtered = filtered[filtered['data'] >= data_inicio_tz]
+                
+                if data_fim:
+                    # Converter data_fim para o mesmo timezone dos dados
+                    try:
+                        if hasattr(filtered['data'].dtype, 'tz') and filtered['data'].dt.tz is not None:
+                            # Dados têm timezone, converter data_fim
+                            data_fim_tz = pd.Timestamp(data_fim).tz_localize('UTC')
+                        else:
+                            # Dados sem timezone, usar timestamp simples
+                            data_fim_tz = pd.Timestamp(data_fim)
+                        filtered = filtered[filtered['data'] <= data_fim_tz]
+                    except Exception:
+                        # Em caso de erro, usar comparação simples
+                        data_fim_tz = pd.Timestamp(data_fim)
+                        filtered = filtered[filtered['data'] <= data_fim_tz]
+                        
+            except Exception:
+                # Se houver erro com datetime, não aplicar filtros de data
+                pass
         
         self.filtered_df = filtered
         return filtered
