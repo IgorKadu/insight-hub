@@ -203,8 +203,8 @@ class InsightsGenerator:
             # Calcular período de análise baseado no range total dos dados filtrados
             date_range = (df['data'].max() - df['data'].min()).days
             
-            # Usar 25% do período total para análise recente, mínimo 1 dia, máximo 7 dias
-            analysis_days = max(1, min(7, date_range // 4))
+            # Usar 25% do período total para análise recente, mínimo 1 dia, máximo 30 dias
+            analysis_days = max(1, min(30, round(date_range * 0.25)))
             
             recent_data = df[df['data'] >= df['data'].max() - timedelta(days=analysis_days)]
             older_data = df[df['data'] < df['data'].max() - timedelta(days=analysis_days)]
@@ -226,10 +226,11 @@ class InsightsGenerator:
                     )
         
         # Predição de manutenção baseada em uso
-        vehicle_usage = df.groupby('placa').agg({
-            'odometro_periodo_km': 'sum',
-            'engine_hours_period': 'sum' if 'engine_hours_period' in df.columns else lambda x: 0
-        })
+        agg_map = {'odometro_periodo_km': 'sum'}
+        if 'engine_hours_period' in df.columns:
+            agg_map['engine_hours_period'] = 'sum'
+        
+        vehicle_usage = df.groupby('placa').agg(agg_map)
         
         for placa, data in vehicle_usage.iterrows():
             total_km = data['odometro_periodo_km']
