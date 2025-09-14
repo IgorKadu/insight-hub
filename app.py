@@ -315,5 +315,13 @@ def main():
                 registros_por_dia = len(df) / max(1, (df['data'].max() - df['data'].min()).days)
                 st.info(f"📈 **Taxa média:** {registros_por_dia:.0f} registros/dia")
 
+# Adicionar navegação personalizada na sidebar
+with st.sidebar:
+    st.markdown("""
+        <div style="padding: 0.5rem 0; margin-bottom: 0.5rem;">
+            <h3 style="margin: 0; color: #262730; font-size: 18px;">🚛 Insight Hub</h3>
+        </div>
+    """, unsafe_allow_html=True)
+
 if __name__ == "__main__":
     main()
