@@ -182,20 +182,31 @@ def apply_filters_to_data(df, client_filter, vehicle_filter, start_date, end_dat
         if vehicle_filter and vehicle_filter != "Todos":
             filtered_df = filtered_df[filtered_df['placa'] == vehicle_filter]
         
-        # Filtro de data
+        # Filtro de data - com tratamento robusto de timezone
         if 'data' in filtered_df.columns and not filtered_df.empty:
-            # Garantir que a coluna data é datetime
-            if not pd.api.types.is_datetime64_any_dtype(filtered_df['data']):
-                filtered_df['data'] = pd.to_datetime(filtered_df['data'], errors='coerce')
-            
-            start_datetime = datetime.combine(start_date, datetime.min.time())
-            end_datetime = datetime.combine(end_date, datetime.max.time())
-            
-            # Aplicar filtros de data
-            filtered_df = filtered_df[
-                (filtered_df['data'] >= start_datetime) & 
-                (filtered_df['data'] <= end_datetime)
-            ]
+            try:
+                # Garantir que a coluna data é datetime
+                if not pd.api.types.is_datetime64_any_dtype(filtered_df['data']):
+                    filtered_df['data'] = pd.to_datetime(filtered_df['data'], errors='coerce')
+                
+                # Criar datetimes para comparação
+                start_datetime = datetime.combine(start_date, datetime.min.time())
+                end_datetime = datetime.combine(end_date, datetime.max.time())
+                
+                # Se dados têm timezone, converter filtros também
+                if filtered_df['data'].dt.tz is not None:
+                    start_datetime = pd.Timestamp(start_datetime).tz_localize('UTC')
+                    end_datetime = pd.Timestamp(end_datetime).tz_localize('UTC')
+                
+                # Aplicar filtros de data
+                filtered_df = filtered_df[
+                    (filtered_df['data'] >= start_datetime) & 
+                    (filtered_df['data'] <= end_datetime)
+                ]
+            except Exception as date_error:
+                # Em caso de erro de datetime, não aplicar filtro de data
+                st.warning(f"Aviso: Erro no filtro de data - {str(date_error)}")
+                pass
         
         return filtered_df
     except Exception as e:

@@ -30,22 +30,26 @@ class FleetVisualizations:
         # Gráfico de velocidade média por veículo
         speed_by_vehicle = self.analyzer.filtered_df.groupby('placa')['velocidade_km'].mean().sort_values(ascending=False)
         
-        charts['speed_by_vehicle'] = px.bar(
+        speed_chart = px.bar(
             x=speed_by_vehicle.values[:15],  # Top 15
             y=speed_by_vehicle.index[:15],
             orientation='h',
             title='Velocidade Média por Veículo (Top 15)',
             labels={'x': 'Velocidade Média (km/h)', 'y': 'Placa'}
         )
+        speed_chart.update_traces(hovertemplate='<b>Veículo:</b> %{y}<br><b>Velocidade Média:</b> %{x:.1f} km/h<extra></extra>')
+        charts['speed_by_vehicle'] = speed_chart
         
         # Gráfico de distribuição de velocidade
-        charts['speed_distribution'] = px.histogram(
+        dist_chart = px.histogram(
             self.analyzer.filtered_df,
             x='velocidade_km',
             nbins=30,
             title='Distribuição de Velocidade',
             labels={'x': 'Velocidade (km/h)', 'y': 'Frequência'}
         )
+        dist_chart.update_traces(hovertemplate='<b>Velocidade:</b> %{x:.1f} km/h<br><b>Frequência:</b> %{y}<extra></extra>')
+        charts['speed_distribution'] = dist_chart
         
         return charts
     
@@ -64,22 +68,26 @@ class FleetVisualizations:
             'velocidade_km': 'mean'
         }).reset_index()
         
-        charts['hourly_activity'] = px.line(
+        activity_chart = px.line(
             hourly_activity,
             x='data',
             y='placa',
             title='Veículos Ativos por Hora do Dia',
             labels={'data': 'Hora', 'placa': 'Número de Veículos Ativos'}
         )
+        activity_chart.update_traces(hovertemplate='<b>Hora:</b> %{x}h<br><b>Veículos Ativos:</b> %{y}<extra></extra>')
+        charts['hourly_activity'] = activity_chart
         
         # Velocidade média por hora
-        charts['hourly_speed'] = px.line(
+        speed_hourly_chart = px.line(
             hourly_activity,
             x='data',
             y='velocidade_km',
             title='Velocidade Média por Hora do Dia',
             labels={'data': 'Hora', 'velocidade_km': 'Velocidade Média (km/h)'}
         )
+        speed_hourly_chart.update_traces(hovertemplate='<b>Hora:</b> %{x}h<br><b>Velocidade Média:</b> %{y:.1f} km/h<extra></extra>')
+        charts['hourly_speed'] = speed_hourly_chart
         
         # Atividade diária
         daily_activity = df.groupby(df['data'].dt.date).agg({
