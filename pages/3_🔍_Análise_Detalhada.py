@@ -484,7 +484,7 @@ def show_operational_analysis(analyzer):
         else:
             return 'background-color: #f8d7da'  # Vermelho claro
     
-    styled_df = efficiency_df.style.applymap(color_efficiency, subset=['Score Eficiência'])
+    styled_df = efficiency_df.style.map(color_efficiency, subset=['Score Eficiência'])
     
     st.dataframe(styled_df, use_container_width=True, height=400)
     

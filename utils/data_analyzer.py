@@ -321,8 +321,8 @@ class DataAnalyzer:
             'odometro_periodo_km': 'sum'
         })
         
-        # Padrões mensais
-        monthly_patterns = df.groupby(df['data'].dt.to_period('M')).agg({
+        # Padrões mensais - usando year+month para evitar warning de timezone
+        monthly_patterns = df.groupby([df['data'].dt.year, df['data'].dt.month]).agg({
             'velocidade_km': 'mean',
             'placa': 'nunique',
             'odometro_periodo_km': 'sum'
