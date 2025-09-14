@@ -44,6 +44,43 @@ class DatabaseManager:
             return 0.0
     
     @staticmethod
+    def migrate_csv_to_database_with_progress(csv_file_path: str, progress_callback=None) -> Dict[str, Any]:
+        """Migrate existing CSV data to database with progress callback"""
+        if not os.path.exists(csv_file_path):
+            return {'success': False, 'error': f'File not found: {csv_file_path}'}
+        
+        try:
+            # Try different separators and encodings with proper validation
+            df = None
+            separators = [',', ';']
+            encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'windows-1252', 'cp1252']
+            
+            for sep in separators:
+                for enc in encodings:
+                    try:
+                        test_df = pd.read_csv(csv_file_path, sep=sep, encoding=enc)
+                        # Validate that we have multiple columns (not just one big column)
+                        if test_df.shape[1] > 1:
+                            df = test_df
+                            print(f"Successfully read CSV with separator='{sep}' and encoding='{enc}' - Shape: {df.shape}")
+                            break
+                        else:
+                            print(f"Separator '{sep}' with encoding '{enc}' resulted in only {test_df.shape[1]} column(s) - trying next combination")
+                    except Exception as e:
+                        print(f"Failed with separator='{sep}' and encoding='{enc}': {str(e)[:100]}")
+                        continue
+                if df is not None:
+                    break
+            
+            if df is None:
+                return {'success': False, 'error': 'Could not read CSV file with any encoding/separator combination that produces multiple columns'}
+            
+            return DatabaseManager.migrate_csv_to_database_from_df_with_progress(df, os.path.basename(csv_file_path), progress_callback)
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
     def migrate_csv_to_database(csv_file_path: str) -> Dict[str, Any]:
         """Migrate existing CSV data to database"""
         if not os.path.exists(csv_file_path):
@@ -76,6 +113,94 @@ class DatabaseManager:
                 return {'success': False, 'error': 'Could not read CSV file with any encoding/separator combination that produces multiple columns'}
             
             return DatabaseManager.migrate_csv_to_database_from_df(df, os.path.basename(csv_file_path))
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
+    def migrate_csv_to_database_from_df_with_progress(df: pd.DataFrame, filename: str = "uploaded_data.csv", progress_callback=None) -> Dict[str, Any]:
+        """Migrate DataFrame to database with progress callback"""
+        try:
+            # Normalize column names first - handle double spaces and irregular spacing
+            df.columns = [' '.join(col.strip().split()) for col in df.columns]
+            
+            total_rows = len(df)
+            processed_rows = 0
+            
+            # Convert to database format
+            records = []
+            for idx, row in df.iterrows():
+                # Get client name with fallback
+                cliente_name = row.get('cliente') or row.get('Cliente')
+                if pd.isna(cliente_name) or cliente_name is None or str(cliente_name).strip() == '':
+                    cliente_name = 'Cliente Desconhecido'  # Fallback
+                
+                # Get plate with fallback
+                placa_value = row.get('placa') or row.get('Placa')
+                if pd.isna(placa_value) or placa_value is None or str(placa_value).strip() == '':
+                    continue  # Skip records without plate
+                
+                record = {
+                    'cliente': str(cliente_name).strip(),
+                    'placa': str(placa_value).strip(),
+                    'ativo': row.get('ativo') or row.get('Ativo'),
+                    'data': pd.to_datetime(row.get('data') or row.get('Data'), errors='coerce', dayfirst=True),
+                    'data_gprs': pd.to_datetime(row.get('data_gprs') or row.get('Data (GPRS)'), errors='coerce', dayfirst=True),
+                    'velocidade_km': DatabaseManager._safe_float_convert(row.get('velocidade_km') or row.get('Velocidade (Km)')),
+                    'ignicao': row.get('ignicao') or row.get('Ignição'),
+                    'motorista': row.get('motorista') or row.get('Motorista'),
+                    'gps': DatabaseManager._safe_int_convert(row.get('gps') or row.get('GPS')),
+                    'gprs': DatabaseManager._safe_int_convert(row.get('gprs') or row.get('Gprs')),
+                    'localizacao': row.get('localizacao') or row.get('Localização'),
+                    'endereco': row.get('endereco') or row.get('Endereço'),
+                    'tipo_evento': row.get('tipo_evento') or row.get('Tipo do Evento'),
+                    'cerca': row.get('cerca') or row.get('Cerca'),
+                    'saida': DatabaseManager._safe_int_convert(row.get('saida') or row.get('Saida')),
+                    'entrada': DatabaseManager._safe_int_convert(row.get('entrada') or row.get('Entrada')),
+                    'pacote': row.get('pacote') or row.get('Pacote'),
+                    'odometro_periodo_km': DatabaseManager._safe_float_convert(row.get('odometro_periodo_km') or row.get('Odômetro Período (Km)')),
+                    'horimetro_periodo': row.get('horimetro_periodo') or row.get('Horímetro Período'),
+                    'horimetro_embarcado': row.get('horimetro_embarcado') or row.get('Horímetro Embarcado'),
+                    'odometro_embarcado_km': DatabaseManager._safe_float_convert(row.get('odometro_embarcado_km') or row.get('Odômetro Embarcado (Km)')),
+                    'bateria': DatabaseManager._safe_float_convert(row.get('bateria') or row.get('Bateria')),
+                    'imagem': row.get('imagem') or row.get('Imagem'),
+                    'tensao': DatabaseManager._safe_float_convert(row.get('tensao') or row.get('Tensão')),
+                    'bloqueado': DatabaseManager._safe_int_convert(row.get('bloqueado') or row.get('Bloqueado')),
+                    'latitude': DatabaseManager._safe_float_convert(row.get('latitude') or row.get('Latitude')),
+                    'longitude': DatabaseManager._safe_float_convert(row.get('longitude') or row.get('Longitude'))
+                }
+                
+                records.append(record)
+                processed_rows += 1
+                
+                # Report progress during data preparation
+                if progress_callback and processed_rows % 100 == 0:
+                    progress_callback(processed_rows, total_rows, "preparando")
+            
+            # Save to database with progress
+            if initialize_database():
+                with FleetDatabaseService() as db:
+                    records_saved = db.save_telematics_data_with_progress(records, progress_callback)
+                    
+                    # Save processing record
+                    unique_vehicles = len(set(r['placa'] for r in records))
+                    unique_clients = len(set(r['cliente'] for r in records))
+                    db.save_processing_record(
+                        filename=filename,
+                        records_processed=records_saved,
+                        unique_vehicles=unique_vehicles,
+                        unique_clients=unique_clients,
+                        file_size_bytes=0  # Will be updated if available
+                    )
+                    
+                    return {
+                        'success': True,
+                        'records_processed': records_saved,
+                        'unique_vehicles': unique_vehicles,
+                        'unique_clients': unique_clients
+                    }
+            else:
+                return {'success': False, 'error': 'Database initialization failed'}
             
         except Exception as e:
             return {'success': False, 'error': str(e)}

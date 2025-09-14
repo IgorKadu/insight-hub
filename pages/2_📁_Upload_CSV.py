@@ -124,52 +124,235 @@ def main():
     show_processing_history()
 
 def process_multiple_csv_files(uploaded_files):
-    """Processa múltiplos arquivos CSV"""
+    """Processa múltiplos arquivos CSV com progresso detalhado"""
     
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+    # Container principal para progresso
+    progress_container = st.container()
+    
+    with progress_container:
+        st.markdown("### 📊 Progresso de Processamento")
+        
+        # Progresso geral
+        overall_progress = st.progress(0)
+        overall_status = st.empty()
+        
+        # Progresso do arquivo atual
+        current_file_info = st.empty()
+        file_progress_bar = st.progress(0)
+        file_status = st.empty()
+        
+        # Métricas em tempo real
+        metrics_cols = st.columns(3)
+        with metrics_cols[0]:
+            files_metric = st.empty()
+        with metrics_cols[1]:
+            records_metric = st.empty()
+        with metrics_cols[2]:
+            speed_metric = st.empty()
     
     total_files = len(uploaded_files)
     processed_files = 0
     total_records = 0
+    failed_files = 0
+    
+    import time
+    start_time = time.time()
     
     for i, uploaded_file in enumerate(uploaded_files):
-        status_text.text(f"🔄 Processando {uploaded_file.name} ({i+1}/{total_files})...")
-        progress_bar.progress((i / total_files))
+        file_start_time = time.time()
         
-        # Processar arquivo individual
-        result = process_single_csv_file(uploaded_file)
+        # Atualizar progresso geral
+        overall_progress.progress(i / total_files)
+        overall_status.markdown(f"📂 **Processando arquivo {i+1} de {total_files}**")
+        
+        # Informações do arquivo atual
+        file_size_mb = uploaded_file.size / (1024 * 1024)
+        current_file_info.markdown(f"""
+        📄 **{uploaded_file.name}**  
+        📏 Tamanho: {file_size_mb:.1f} MB
+        """)
+        
+        # Resetar progresso do arquivo
+        file_progress_bar.progress(0)
+        file_status.markdown("🔄 Iniciando processamento...")
+        
+        # Atualizar métricas
+        files_metric.metric(
+            label="📁 Arquivos",
+            value=f"{processed_files + failed_files}/{total_files}",
+            delta=f"{i}/{total_files}"
+        )
+        records_metric.metric(
+            label="📊 Registros",
+            value=f"{total_records:,}",
+            delta="Processando..."
+        )
+        
+        elapsed_time = time.time() - start_time
+        if elapsed_time > 0:
+            files_per_min = (i / elapsed_time) * 60
+            speed_metric.metric(
+                label="⚡ Velocidade",
+                value=f"{files_per_min:.1f}",
+                delta="arquivos/min"
+            )
+        
+        # Processar arquivo com callback de progresso
+        result = process_single_csv_file_with_progress(
+            uploaded_file, 
+            file_progress_bar, 
+            file_status
+        )
+        
+        # Finalizar progresso do arquivo
+        file_progress_bar.progress(1.0)
+        file_processing_time = time.time() - file_start_time
         
         if result['success']:
             processed_files += 1
-            total_records += result.get('records_processed', 0)
-            st.success(f"✅ {uploaded_file.name}: {result.get('records_processed', 0)} registros")
+            records_processed = result.get('records_processed', 0)
+            total_records += records_processed
+            
+            file_status.markdown(f"✅ **Concluído!** {records_processed:,} registros em {file_processing_time:.1f}s")
+            
+            # Log de sucesso
+            with st.expander(f"✅ {uploaded_file.name}", expanded=False):
+                st.success(f"Processado com sucesso: {records_processed:,} registros")
+                st.info(f"Tempo: {file_processing_time:.1f}s | Velocidade: {records_processed/file_processing_time:.0f} reg/s")
         else:
-            st.error(f"❌ {uploaded_file.name}: {result.get('error', 'Erro desconhecido')}")
+            failed_files += 1
+            file_status.markdown("❌ **Erro no processamento**")
+            
+            # Log de erro
+            with st.expander(f"❌ {uploaded_file.name}", expanded=True):
+                st.error(f"Erro: {result.get('error', 'Erro desconhecido')}")
+        
+        # Pequena pausa para visualização
+        time.sleep(0.1)
     
-    progress_bar.progress(1.0)
-    status_text.text("✅ Processamento concluído!")
+    # Finalizar progresso geral
+    overall_progress.progress(1.0)
+    total_time = time.time() - start_time
     
-    st.success(f"""
-    🎉 **Processamento concluído!**
-    - Arquivos processados: {processed_files}/{total_files}
-    - Total de registros: {total_records:,}
-    """)
+    overall_status.markdown("🎉 **Processamento Finalizado!**")
+    current_file_info.markdown("📁 **Todos os arquivos processados**")
+    file_status.markdown(f"⏱️ Tempo total: {total_time:.1f}s")
+    
+    # Métricas finais
+    files_metric.metric(
+        label="📁 Arquivos",
+        value=f"{processed_files}/{total_files}",
+        delta=f"{failed_files} erros" if failed_files > 0 else "Todos OK"
+    )
+    records_metric.metric(
+        label="📊 Registros",
+        value=f"{total_records:,}",
+        delta="Processados"
+    )
+    speed_metric.metric(
+        label="⚡ Velocidade média",
+        value=f"{total_records/total_time:.0f}" if total_time > 0 else "0",
+        delta="registros/s"
+    )
+    
+    # Resumo final
+    if processed_files == total_files:
+        st.success(f"""
+        🎉 **Processamento 100% concluído!**
+        - ✅ {processed_files} arquivos processados com sucesso
+        - 📊 {total_records:,} registros inseridos na base de dados
+        - ⏱️ Tempo total: {total_time:.1f} segundos
+        - ⚡ Velocidade média: {total_records/total_time:.0f} registros/segundo
+        """)
+    else:
+        st.warning(f"""
+        ⚠️ **Processamento concluído com erros**
+        - ✅ {processed_files} arquivos processados com sucesso
+        - ❌ {failed_files} arquivos com erro
+        - 📊 {total_records:,} registros inseridos na base de dados
+        - ⏱️ Tempo total: {total_time:.1f} segundos
+        """)
 
-def process_single_csv_file(uploaded_file):
-    """Processa um único arquivo CSV"""
+def process_single_csv_file_with_progress(uploaded_file, progress_bar, status_display):
+    """Processa um único arquivo CSV com progresso em tempo real"""
     
     try:
-        # Salvar arquivo temporário
+        import tempfile
+        import time
+        
+        # Fase 1: Salvando arquivo temporário
+        status_display.markdown("📥 Salvando arquivo temporário...")
+        progress_bar.progress(0.1)
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_path = tmp_file.name
+        
+        # Fase 2: Analisando estrutura
+        status_display.markdown("🔍 Analisando estrutura do arquivo...")
+        progress_bar.progress(0.2)
+        time.sleep(0.1)
+        
+        # Contagem estimada de linhas para melhor progresso
+        try:
+            with open(tmp_path, 'r', encoding='latin-1') as f:
+                estimated_rows = sum(1 for _ in f) - 1  # -1 para header
+        except:
+            estimated_rows = 1000  # Fallback
+        
+        status_display.markdown(f"📊 Arquivo com ~{estimated_rows:,} registros detectados")
+        progress_bar.progress(0.3)
+        
+        # Fase 3: Processando dados
+        status_display.markdown("⚙️ Processando e validando dados...")
+        progress_bar.progress(0.5)
+        time.sleep(0.2)
+        
+        # Fase 4: Inserindo na base de dados
+        status_display.markdown("💾 Inserindo registros na base de dados...")
+        progress_bar.progress(0.7)
+        
+        # Usar DatabaseManager para migrar com progresso
+        def update_progress(current, total, phase):
+            progress = 0.7 + (current / total) * 0.2  # 70% até 90%
+            progress_bar.progress(progress)
+            if phase == "preparando":
+                status_display.markdown(f"⚙️ Preparando dados: {current:,}/{total:,}")
+            elif phase == "inserindo":
+                status_display.markdown(f"💾 Inserindo registros: {current:,}/{total:,}")
+        
+        result = DatabaseManager.migrate_csv_to_database_with_progress(tmp_path, update_progress)
+        
+        # Fase 5: Finalizando
+        status_display.markdown("🔄 Finalizando processamento...")
+        progress_bar.progress(0.9)
+        time.sleep(0.1)
+        
+        # Limpar arquivo temporário
+        import os
+        os.unlink(tmp_path)
+        
+        return result
+        
+    except Exception as e:
+        status_display.markdown(f"❌ Erro: {str(e)}")
+        return {
+            'success': False,
+            'error': f'Erro no processamento: {str(e)}',
+            'records_processed': 0
+        }
+
+def process_single_csv_file(uploaded_file):
+    """Processa um único arquivo CSV (versão simplificada para compatibilidade)"""
+    
+    try:
         import tempfile
         with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
             tmp_path = tmp_file.name
         
-        # Usar DatabaseManager para migrar para base de dados
         result = DatabaseManager.migrate_csv_to_database(tmp_path)
         
-        # Limpar arquivo temporário
         import os
         os.unlink(tmp_path)
         

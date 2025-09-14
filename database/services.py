@@ -69,6 +69,96 @@ class FleetDatabaseService:
         return self.session.query(Vehicle).all()
     
     # Telematics data operations
+    def save_telematics_data_with_progress(self, data_records: List[Dict[str, Any]], progress_callback=None) -> int:
+        """Save multiple telematics data records with progress callback"""
+        records_saved = 0
+        records_failed = 0
+        total_records = len(data_records)
+        
+        # Process in batches to avoid memory issues
+        batch_size = 50  # Smaller batch for more frequent progress updates
+        for i in range(0, total_records, batch_size):
+            batch = data_records[i:i + batch_size]
+            batch_saved = 0
+            
+            try:
+                for record in batch:
+                    try:
+                        # Validate timestamp before processing
+                        timestamp = record.get('data')
+                        if timestamp is None or pd.isna(timestamp):
+                            records_failed += 1
+                            continue
+                        
+                        # Get or create client and vehicle
+                        client = self.get_or_create_client(record['cliente'])
+                        vehicle = self.get_or_create_vehicle(
+                            record['placa'], 
+                            client.id, 
+                            record.get('ativo')
+                        )
+                        
+                        # Create telematics data record
+                        telematics = TelematicsData(
+                            client_id=client.id,
+                            vehicle_id=vehicle.id,
+                            plate=record['placa'],
+                            asset_id=record.get('ativo'),
+                            timestamp=timestamp,
+                            gprs_timestamp=record.get('data_gprs'),
+                            latitude=record.get('latitude'),
+                            longitude=record.get('longitude'),
+                            location=record.get('localizacao'),
+                            address=record.get('endereco'),
+                            gps_quality=record.get('gps', 0) == 1,
+                            gprs_quality=record.get('gprs', 0) == 1,
+                            speed_kmh=record.get('velocidade_km', 0.0),
+                            ignition=record.get('ignicao'),
+                            driver_name=record.get('motorista'),
+                            blocked=record.get('bloqueado', 0) == 1,
+                            event_type=record.get('tipo_evento'),
+                            geofence=record.get('cerca'),
+                            entry=record.get('entrada', 0) == 1,
+                            exit=record.get('saida', 0) == 1,
+                            packet_id=record.get('pacote'),
+                            odometer_period_km=record.get('odometro_periodo_km', 0.0),
+                            odometer_embedded_km=record.get('odometro_embarcado_km', 0.0),
+                            hourmeter_period=record.get('horimetro_periodo'),
+                            hourmeter_embedded=record.get('horimetro_embarcado'),
+                            battery_voltage=record.get('bateria'),
+                            voltage=record.get('tensao'),
+                            image_url=record.get('imagem')
+                        )
+                        
+                        self.session.add(telematics)
+                        batch_saved += 1
+                        records_saved += 1
+                        
+                        # Report progress every 10 records within batch
+                        if progress_callback and records_saved % 10 == 0:
+                            progress_callback(records_saved, total_records, "inserindo")
+                        
+                    except Exception as record_error:
+                        records_failed += 1
+                        print(f"Failed to save record: {str(record_error)[:200]}")
+                        continue
+                
+                # Commit the batch
+                self.session.commit()
+                
+                # Report progress after each batch
+                if progress_callback:
+                    progress_callback(records_saved, total_records, "inserindo")
+                
+            except Exception as batch_error:
+                self.session.rollback()
+                records_failed += batch_size
+                print(f"Batch failed: {str(batch_error)[:200]}")
+                continue
+        
+        print(f"Batch insertion completed: {records_saved} saved, {records_failed} failed")
+        return records_saved
+    
     def save_telematics_data(self, data_records: List[Dict[str, Any]]) -> int:
         """Save multiple telematics data records with proper error handling"""
         records_saved = 0
