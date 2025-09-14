@@ -9,11 +9,16 @@ from database.db_manager import DatabaseManager
 
 # Configuração da página
 st.set_page_config(
-    page_title="Insight Hub - Monitoramento de Frotas",
+    page_title="🚛 Insight Hub",
     page_icon="🚛",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Configurar título da sidebar para substituir "app"
+st.sidebar.markdown("### 🚛 Insight Hub")
+st.sidebar.markdown("**Monitoramento de Frotas**")
+st.sidebar.markdown("---")
 
 # CSS customizado para melhor aparência
 st.markdown("""
@@ -135,22 +140,149 @@ def main():
             labels={'data': 'Data', 'registros': 'Número de Registros'}
         )
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
-        # Top veículos por atividade
-        st.markdown("### 🚗 **Veículos Mais Ativos**")
+        # Indicadores de Qualidade e Performance
+        st.markdown("### 🎯 **Indicadores de Performance do Sistema**")
         
-        vehicle_activity = df.groupby('placa').size().sort_values(ascending=False).head(10)
+        col1, col2, col3, col4 = st.columns(4)
         
-        fig_bar = px.bar(
-            x=vehicle_activity.values,
-            y=vehicle_activity.index,
-            orientation='h',
-            title='Top 10 Veículos por Número de Registros',
-            labels={'x': 'Número de Registros', 'y': 'Placa'}
+        # Calcular métricas de qualidade
+        coordenadas_validas = len(df[(df['latitude'] != 0) & (df['longitude'] != 0) & 
+                                   (df['latitude'].notna()) & (df['longitude'].notna())])
+        gps_quality = df['gps'].mean() if 'gps' in df.columns else 0
+        gprs_quality = df['gprs'].mean() if 'gprs' in df.columns else 0
+        velocidade_media = df['velocidade_km'].mean() if 'velocidade_km' in df.columns else 0
+        
+        with col1:
+            coord_percent = (coordenadas_validas / len(df) * 100) if len(df) > 0 else 0
+            st.metric("🗺️ Coordenadas Válidas", f"{coord_percent:.1f}%", 
+                     delta=f"{coordenadas_validas:,} de {len(df):,}")
+        
+        with col2:
+            st.metric("📡 Qualidade GPS", f"{gps_quality:.1f}%", 
+                     delta="Média geral")
+        
+        with col3:
+            st.metric("📶 Qualidade GPRS", f"{gprs_quality:.1f}%", 
+                     delta="Conectividade")
+        
+        with col4:
+            st.metric("🚗 Velocidade Média", f"{velocidade_media:.1f} km/h", 
+                     delta="Frota geral")
+        
+        # Análise de Cobertura Temporal e Operacional
+        st.markdown("### ⏰ **Análise Operacional**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Análise por horário
+            if 'data' in df.columns:
+                df_temp = df.copy()
+                df_temp['hora'] = df_temp['data'].dt.hour
+                hourly_activity = df_temp.groupby('hora').size()
+                
+                fig_hourly = px.bar(
+                    x=hourly_activity.index,
+                    y=hourly_activity.values,
+                    title='Atividade por Hora do Dia',
+                    labels={'x': 'Hora', 'y': 'Número de Registros'},
+                    color=hourly_activity.values,
+                    color_continuous_scale='Blues'
+                )
+                fig_hourly.update_layout(height=300, showlegend=False)
+                st.plotly_chart(fig_hourly, width='stretch')
+        
+        with col2:
+            # Top veículos por atividade
+            vehicle_activity = df.groupby('placa').size().sort_values(ascending=False).head(8)
+            
+            fig_vehicles = px.bar(
+                x=vehicle_activity.values,
+                y=vehicle_activity.index,
+                orientation='h',
+                title='Top 8 Veículos Mais Ativos',
+                labels={'x': 'Registros', 'y': 'Placa'},
+                color=vehicle_activity.values,
+                color_continuous_scale='Greens'
+            )
+            fig_vehicles.update_layout(height=300, showlegend=False)
+            st.plotly_chart(fig_vehicles, width='stretch')
+        
+        # Alertas e Anomalias
+        st.markdown("### 🚨 **Status e Alertas do Sistema**")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Veículos inativos (sem registros recentes)
+            if 'data' in df.columns and not df.empty:
+                data_mais_recente = df['data'].max()
+                veiculos_inativos = df[df['data'] < (data_mais_recente - timedelta(days=1))]['placa'].nunique()
+                total_veiculos = df['placa'].nunique()
+                st.metric("⚠️ Veículos com Inatividade", f"{veiculos_inativos}",
+                         delta=f"de {total_veiculos} total")
+        
+        with col2:
+            # Registros sem coordenadas
+            registros_sem_coord = len(df) - coordenadas_validas
+            percent_sem_coord = (registros_sem_coord / len(df) * 100) if len(df) > 0 else 0
+            delta_color = "inverse" if percent_sem_coord > 5 else "normal"
+            st.metric("📍 Registros sem GPS", f"{registros_sem_coord:,}",
+                     delta=f"{percent_sem_coord:.1f}% do total",
+                     delta_color=delta_color)
+        
+        with col3:
+            # Análise de conectividade
+            if 'ignicao' in df.columns:
+                ignicao_ligada = len(df[df['ignicao'] == 'Ligada']) if 'ignicao' in df.columns else 0
+                percent_ignicao = (ignicao_ligada / len(df) * 100) if len(df) > 0 else 0
+                st.metric("🔑 Registros c/ Ignição", f"{percent_ignicao:.1f}%",
+                         delta=f"{ignicao_ligada:,} registros")
+        
+        # Distribuição temporal melhorada
+        st.markdown("### 📊 **Distribuição Temporal dos Dados**")
+        
+        # Agrupar por data
+        daily_data = df.groupby(df['data'].dt.date).size().reset_index()
+        daily_data.columns = ['data', 'registros']
+        
+        fig = px.line(
+            daily_data, 
+            x='data', 
+            y='registros',
+            title='Evolução Diária de Registros',
+            labels={'data': 'Data', 'registros': 'Número de Registros'},
+            markers=True
         )
-        fig_bar.update_layout(height=400)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        fig.update_layout(height=400)
+        fig.add_hline(y=daily_data['registros'].mean(), line_dash="dash", 
+                     line_color="red", annotation_text="Média")
+        st.plotly_chart(fig, width='stretch')
+        
+        # Informações adicionais de sistema
+        st.markdown("### 💾 **Informações do Sistema**")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Última atualização
+            if 'data' in df.columns and not df.empty:
+                ultima_atualizacao = df['data'].max()
+                st.info(f"🕐 **Última atualização:** {ultima_atualizacao.strftime('%d/%m/%Y %H:%M')}")
+        
+        with col2:
+            # Período total coberto
+            if 'data' in df.columns and not df.empty:
+                periodo_total = (df['data'].max() - df['data'].min()).days
+                st.info(f"📅 **Período coberto:** {periodo_total} dias de dados")
+        
+        with col3:
+            # Taxa de dados por dia
+            if 'data' in df.columns and not df.empty:
+                registros_por_dia = len(df) / max(1, (df['data'].max() - df['data'].min()).days)
+                st.info(f"📈 **Taxa média:** {registros_por_dia:.0f} registros/dia")
 
 if __name__ == "__main__":
     main()
