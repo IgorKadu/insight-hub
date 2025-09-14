@@ -45,12 +45,12 @@ def main():
         with col1:
             start_date = st.date_input(
                 "Data Início:",
-                value=datetime.now().date() - timedelta(days=7)
+                value=datetime(2025, 8, 6).date()  # Início dos dados disponíveis
             )
         with col2:
             end_date = st.date_input(
                 "Data Fim:",
-                value=datetime.now().date()
+                value=datetime(2025, 8, 31).date()  # Fim dos dados disponíveis
             )
         
         # Filtros de horário autorizado
@@ -108,6 +108,8 @@ def main():
     # Aplicar filtros aos dados já carregados
     # Usar método centralizado de filtros do DataAnalyzer
     analyzer = DataAnalyzer(df_inicial)
+    
+    # Aplicar filtros com método centralizado do DataAnalyzer
     df = analyzer.apply_filters(
         cliente=selected_client,
         placa=selected_vehicle,
@@ -213,8 +215,14 @@ def apply_time_filters(df, time_filter_mode, custom_start_time=None, custom_end_
     
     # Filtrar por período autorizado ou violações
     if time_filter_mode == "Apenas horários autorizados":
+        # Criar lógica de horário autorizado se não existir
+        if 'operacao_autorizada' not in df_filtered.columns:
+            df_filtered = create_authorization_logic(df_filtered)
         df_filtered = df_filtered[df_filtered['operacao_autorizada'] == True]
     elif time_filter_mode == "Apenas violações de horário":
+        # Criar lógica de horário autorizado se não existir
+        if 'operacao_autorizada' not in df_filtered.columns:
+            df_filtered = create_authorization_logic(df_filtered)
         df_filtered = df_filtered[df_filtered['operacao_autorizada'] == False]
     elif time_filter_mode == "Período personalizado" and custom_start_time and custom_end_time:
         # Filtrar por horário personalizado
@@ -225,6 +233,46 @@ def apply_time_filters(df, time_filter_mode, custom_start_time=None, custom_end_
         df_filtered = df_filtered[hour_filter]
     
     return df_filtered
+
+def create_authorization_logic(df):
+    """Cria a lógica de autorização para o DataFrame"""
+    if df.empty:
+        return df
+    
+    df = df.copy()
+    
+    # Extrair informações de tempo
+    df['hora'] = df['data'].dt.hour
+    df['minuto'] = df['data'].dt.minute
+    df['dia_semana'] = df['data'].dt.dayofweek  # 0=Segunda, 6=Domingo
+    
+    # Determinar se o horário está dentro dos períodos autorizados
+    df['horario_permitido'] = df.apply(lambda row: is_authorized_time_simple(row['hora'], row['minuto']), axis=1)
+    df['dia_util'] = df['dia_semana'] < 5  # Segunda a Sexta (0-4)
+    df['operacao_autorizada'] = df['horario_permitido'] & df['dia_util']
+    
+    return df
+
+def is_authorized_time_simple(hora, minuto):
+    """Verifica se o horário está dentro dos períodos autorizados - versão simplificada"""
+    time_current = time(hora, minuto)
+    
+    # Horários permitidos pela prefeitura
+    morning_start = time(4, 0)   # 04:00
+    morning_end = time(7, 0)     # 07:00
+    
+    lunch_start = time(10, 50)   # 10:50
+    lunch_end = time(13, 0)      # 13:00
+    
+    afternoon_start = time(16, 50)  # 16:50
+    afternoon_end = time(19, 0)     # 19:00
+    
+    # Verificar se está em algum período permitido
+    is_morning = morning_start <= time_current <= morning_end
+    is_lunch = lunch_start <= time_current <= lunch_end
+    is_afternoon = afternoon_start <= time_current <= afternoon_end
+    
+    return is_morning or is_lunch or is_afternoon
 
 def safe_column_access(df, column, default_value=None, numeric=False):
     """Acesso seguro a colunas do DataFrame com valores padrão"""
