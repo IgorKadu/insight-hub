@@ -544,32 +544,52 @@ def show_processing_history():
             st.info("Funcionalidade de limpeza de histórico será implementada.")
     
     with col2:
+        # Inicializar session state se não existir
+        if "confirm_clear_data" not in st.session_state:
+            st.session_state.confirm_clear_data = False
+        
         if st.button("🗂️ Limpar Todos os Dados", type="secondary", help="Remove TODOS os dados da base (histórico + registros)"):
+            st.session_state.confirm_clear_data = True
+        
+        # Mostrar confirmação se solicitada
+        if st.session_state.confirm_clear_data:
             st.warning("⚠️ **ATENÇÃO**: Esta ação irá remover TODOS os dados da base de dados!")
             
-            # Confirmation dialog
-            if st.button("✅ Confirmar Limpeza Completa", type="primary"):
-                try:
-                    # Clear all data from database
-                    result = DatabaseManager.clear_all_data()
-                    
-                    st.success(f"""
-                    🎉 **Limpeza completa realizada com sucesso!**
-                    
-                    **Dados removidos:**
-                    - 🗂️ {result.get('telematics_data', 0):,} registros telemétricos
-                    - 📋 {result.get('processing_history', 0)} registros de histórico  
-                    - 🚗 {result.get('vehicles', 0)} veículos
-                    - 🏢 {result.get('clients', 0)} clientes
-                    
-                    **Sistema resetado!** Agora você pode fazer novos uploads.
-                    """)
-                    
-                    # Recarregar a página para refletir mudanças
+            col_conf1, col_conf2 = st.columns(2)
+            
+            with col_conf1:
+                if st.button("✅ SIM, Limpar Tudo", type="primary"):
+                    try:
+                        with st.spinner("🔄 Limpando todos os dados..."):
+                            # Clear all data from database
+                            result = DatabaseManager.clear_all_data()
+                        
+                        st.success(f"""
+                        🎉 **Limpeza completa realizada com sucesso!**
+                        
+                        **Dados removidos:**
+                        - 🗂️ {result.get('telematics_data', 0):,} registros telemétricos
+                        - 📋 {result.get('processing_history', 0)} registros de histórico  
+                        - 🚗 {result.get('vehicles', 0)} veículos
+                        - 🏢 {result.get('clients', 0)} clientes
+                        
+                        **Sistema resetado!** Agora você pode fazer novos uploads.
+                        """)
+                        
+                        # Reset session state
+                        st.session_state.confirm_clear_data = False
+                        
+                        # Recarregar a página para refletir mudanças
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erro ao limpar dados: {str(e)}")
+                        st.session_state.confirm_clear_data = False
+            
+            with col_conf2:
+                if st.button("❌ Cancelar", type="secondary"):
+                    st.session_state.confirm_clear_data = False
                     st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"❌ Erro ao limpar dados: {str(e)}")
 
 def show_processing_history_old():
     """Mostra histórico de processamentos (versão antiga usando arquivo)"""
