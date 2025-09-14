@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import sys
+sys.path.append('.')
+from database.db_manager import DatabaseManager
 
 class DataAnalyzer:
     """Classe para análise de dados de frota"""
@@ -12,6 +15,43 @@ class DataAnalyzer:
         """Inicializa o analisador com DataFrame"""
         self.df = df
         self.filtered_df = df.copy()
+    
+    @classmethod
+    def from_database(cls, cliente=None, placa=None, data_inicio=None, data_fim=None):
+        """Cria uma instância do analisador usando dados da base de dados"""
+        try:
+            # Verificar se há dados na base de dados
+            if not DatabaseManager.has_data():
+                # Fall back para dados em arquivo se disponível
+                import os
+                if os.path.exists('data/processed_data.csv'):
+                    df = pd.read_csv('data/processed_data.csv')
+                    # Converter data se necessário
+                    if 'data' in df.columns:
+                        df['data'] = pd.to_datetime(df['data'], errors='coerce')
+                else:
+                    # Criar DataFrame vazio com estrutura esperada
+                    df = pd.DataFrame(columns=[
+                        'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
+                        'gps', 'bloqueado', 'horimetro_periodo_horas'
+                    ])
+            else:
+                # Buscar dados da base de dados com filtros
+                df = DatabaseManager.get_dashboard_data(
+                    client_filter=cliente if cliente != "Todos" else None,
+                    vehicle_filter=placa if placa != "Todos" else None,
+                    start_date=data_inicio,
+                    end_date=data_fim
+                )
+            
+            return cls(df)
+        except Exception as e:
+            # Em caso de erro, retornar analisador com DataFrame vazio
+            empty_df = pd.DataFrame(columns=[
+                'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
+                'gps', 'bloqueado', 'horimetro_periodo_horas'
+            ])
+            return cls(empty_df)
     
     def apply_filters(self, cliente=None, placa=None, data_inicio=None, data_fim=None):
         """Aplica filtros aos dados"""

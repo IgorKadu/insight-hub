@@ -8,6 +8,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.csv_processor import CSVProcessor
+from database.db_manager import DatabaseManager
 
 st.set_page_config(
     page_title="Upload CSV - Insight Hub",

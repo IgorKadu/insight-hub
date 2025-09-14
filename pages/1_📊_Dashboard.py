@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.data_analyzer import DataAnalyzer
 from utils.visualizations import FleetVisualizations
+from database.db_manager import DatabaseManager
 
 st.set_page_config(
     page_title="Dashboard - Insight Hub",
@@ -19,17 +20,25 @@ st.set_page_config(
 )
 
 def load_data():
-    """Carrega dados processados"""
-    data_file = "data/processed_data.csv"
-    if os.path.exists(data_file):
-        try:
+    """Carrega dados processados da base de dados ou arquivo"""
+    try:
+        # Tentar carregar da base de dados primeiro
+        if DatabaseManager.has_data():
+            df = DatabaseManager.get_dashboard_data()
+            if not df.empty:
+                return df
+        
+        # Fall back para arquivo se não há dados na base de dados
+        data_file = "data/processed_data.csv"
+        if os.path.exists(data_file):
             df = pd.read_csv(data_file)
             df['data'] = pd.to_datetime(df['data'])
             return df
-        except Exception as e:
-            st.error(f"Erro ao carregar dados: {str(e)}")
-            return pd.DataFrame()
-    return pd.DataFrame()
+            
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {str(e)}")
+        return pd.DataFrame()
 
 def main():
     st.title("📊 Dashboard de Monitoramento")
@@ -42,8 +51,8 @@ def main():
         st.warning("📁 Nenhum dado encontrado. Faça o upload de um arquivo CSV primeiro.")
         st.stop()
     
-    # Inicializar analisador
-    analyzer = DataAnalyzer(df)
+    # Inicializar analisador com dados da base de dados
+    analyzer = DataAnalyzer.from_database()
     visualizer = FleetVisualizations(analyzer)
     
     # Sidebar com filtros
