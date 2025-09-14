@@ -213,17 +213,19 @@ class InsightsGenerator:
                 recent_avg_speed = recent_data['velocidade_km'].mean()
                 older_avg_speed = older_data['velocidade_km'].mean()
                 
-                speed_change = ((recent_avg_speed - older_avg_speed) / older_avg_speed) * 100
-                
-                if abs(speed_change) > 10:
-                    trend = "aumento" if speed_change > 0 else "redução"
-                    period_text = f"últimos {analysis_days} dia{'s' if analysis_days > 1 else ''}"
-                    self.add_insight(
-                        f"📈 Tendência de Velocidade",
-                        f"Detectado {trend} de {abs(speed_change):.1f}% na velocidade média nos {period_text}.",
-                        f"Monitore esta tendência para identificar padrões sazonais ou operacionais.",
-                        "info"
-                    )
+                # Evitar divisão por zero e valores inválidos
+                if pd.notna(older_avg_speed) and pd.notna(recent_avg_speed) and older_avg_speed > 0:
+                    speed_change = ((recent_avg_speed - older_avg_speed) / older_avg_speed) * 100
+                    
+                    if abs(speed_change) > 10:
+                        trend = "aumento" if speed_change > 0 else "redução"
+                        period_text = f"últimos {analysis_days} dia{'s' if analysis_days > 1 else ''}"
+                        self.add_insight(
+                            f"📈 Tendência de Velocidade",
+                            f"Detectado {trend} de {abs(speed_change):.1f}% na velocidade média nos {period_text}.",
+                            f"Monitore esta tendência para identificar padrões sazonais ou operacionais.",
+                            "info"
+                        )
         
         # Predição de manutenção baseada em uso
         agg_map = {'odometro_periodo_km': 'sum'}
