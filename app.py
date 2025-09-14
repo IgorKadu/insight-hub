@@ -15,9 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Configurar título da sidebar para substituir "app"
-st.sidebar.markdown("### 🚛 Insight Hub")
-st.sidebar.markdown("**Monitoramento de Frotas**")
+# Configuração da sidebar
 st.sidebar.markdown("---")
 
 # CSS customizado para melhor aparência
