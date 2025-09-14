@@ -12,5 +12,3 @@ secondaryBackgroundColor = "#f0f2f6"
 [browser]
 gatherUsageStats = false
 
-[client]
-showSidebarNavigation = false
