@@ -26,30 +26,13 @@ def load_data():
         # Importar DatabaseManager
         from database.db_manager import DatabaseManager
         
-        # Verificar se há dados primeiro (mais rápido)
-        if not DatabaseManager.has_data():
-            st.warning("⚠️ Nenhum dado real encontrado na base de dados. Faça upload dos seus arquivos CSV.")
-            return pd.DataFrame()
-        
-        # Carregar apenas últimos 30 dias para melhor performance
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=30)
-        
-        with st.spinner("🔄 Carregando dados para comparação (últimos 30 dias)..."):
-            df = DatabaseManager.get_dashboard_data(
-                start_date=start_date,
-                end_date=end_date
-            )
+        # Carregar TODOS os dados por padrão conforme solicitado pelo usuário
+        with st.spinner("🔄 Carregando todos os dados para comparação..."):
+            df = DatabaseManager.get_dashboard_data()
             
             if not df.empty:
-                st.success(f"✅ Dados carregados: {len(df):,} registros (últimos 30 dias)")
+                st.success(f"✅ Todos os dados carregados: {len(df):,} registros")
                 return df
-            else:
-                # Se não há dados nos últimos 30 dias, carregar todos
-                df = DatabaseManager.get_dashboard_data()
-                if not df.empty:
-                    st.info(f"📊 Carregados todos os dados históricos: {len(df):,} registros")
-                    return df
         
         st.warning("⚠️ Nenhum dado encontrado na base de dados.")
         return pd.DataFrame()

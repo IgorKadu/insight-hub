@@ -13,9 +13,13 @@ st.set_page_config(page_title="Relatórios", page_icon="📄", layout="wide")
 st.title("📄 Relatórios Avançados")
 st.markdown("*Sistema completo de geração de relatórios com dados consolidados de todos os painéis*")
 
-if not DatabaseManager.has_data():
+# Carregar dados diretamente da base de dados
+df_inicial = DatabaseManager.get_dashboard_data()
+if df_inicial.empty:
     st.warning("⚠️ Nenhum dado encontrado. Faça upload de arquivos CSV primeiro.")
     st.stop()
+else:
+    st.success(f"✅ Dados carregados: {len(df_inicial):,} registros para geração de relatórios")
 
 # Carregar dados com cache para performance
 @st.cache_data(ttl=300)  # Cache por 5 minutos

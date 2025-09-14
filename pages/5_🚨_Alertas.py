@@ -9,9 +9,13 @@ from utils.alert_system import AlertSystem
 st.set_page_config(page_title="Alertas", page_icon="🚨", layout="wide")
 st.title("🚨 Alertas em Tempo Real")
 
-if not DatabaseManager.has_data():
-    st.warning("⚠️ Nenhum dado encontrado.")
+# Carregar dados diretamente em vez de usar has_data()
+df = DatabaseManager.get_dashboard_data()
+if df.empty:
+    st.warning("⚠️ Nenhum dado encontrado. Faça o upload de um arquivo CSV primeiro.")
     st.stop()
+else:
+    st.success(f"✅ Dados carregados: {len(df):,} registros para análise de alertas")
 
 # Sistema de alertas
 alert_system = AlertSystem()

@@ -11,10 +11,13 @@ def main():
     st.title("🚨 Controle Operacional")
     st.markdown("**Monitoramento de conformidade operacional das vans da prefeitura**")
     
-    # Verificar se há dados
-    if not DatabaseManager.has_data():
+    # Carregar dados diretamente
+    df = DatabaseManager.get_dashboard_data()
+    if df.empty:
         st.warning("⚠️ Não há dados carregados. Faça upload de arquivos CSV primeiro.")
         return
+    else:
+        st.success(f"✅ Dados carregados: {len(df):,} registros para controle operacional")
     
     # Sidebar com filtros
     with st.sidebar:
@@ -140,10 +143,9 @@ def main():
 def get_client_list():
     """Busca lista de clientes com cache para melhor performance"""
     try:
-        if DatabaseManager.has_data():
-            df = DatabaseManager.get_dashboard_data()
-            if not df.empty and 'cliente' in df.columns:
-                return sorted(df['cliente'].unique().tolist())
+        df = DatabaseManager.get_dashboard_data()
+        if not df.empty and 'cliente' in df.columns:
+            return sorted(df['cliente'].unique().tolist())
         return []
     except Exception as e:
         st.error(f"Erro ao carregar clientes: {str(e)}")
@@ -153,13 +155,12 @@ def get_client_list():
 def get_vehicle_list(client_filter=None):
     """Busca lista de veículos com cache para melhor performance"""
     try:
-        if DatabaseManager.has_data():
-            df = DatabaseManager.get_dashboard_data()
-            if not df.empty and 'placa' in df.columns:
-                # Filtrar por cliente se especificado
-                if client_filter and client_filter != "Todos":
-                    df = df[df['cliente'] == client_filter]
-                return sorted(df['placa'].unique().tolist())
+        df = DatabaseManager.get_dashboard_data()
+        if not df.empty and 'placa' in df.columns:
+            # Filtrar por cliente se especificado
+            if client_filter and client_filter != "Todos":
+                df = df[df['cliente'] == client_filter]
+            return sorted(df['placa'].unique().tolist())
         return []
     except Exception as e:
         st.error(f"Erro ao carregar veículos: {str(e)}")

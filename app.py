@@ -37,11 +37,9 @@ st.markdown("""
 def load_processed_data():
     """Carrega dados da base PostgreSQL"""
     try:
-        if not DatabaseManager.has_data():
-            return pd.DataFrame()
-        
         df = DatabaseManager.get_dashboard_data()
         if not df.empty:
+            st.success(f"✅ Dados carregados: {len(df):,} registros da base PostgreSQL")
             return df
         return pd.DataFrame()
     except Exception as e:
