@@ -90,10 +90,20 @@ class DataAnalyzer:
                         else:
                             # Dados sem timezone, usar timestamp simples
                             data_fim_tz = pd.Timestamp(data_fim)
+                        
+                        # CORREÇÃO: Se mesmo dia, incluir todo o dia até 23:59:59
+                        if data_inicio and pd.Timestamp(data_inicio).date() == pd.Timestamp(data_fim).date():
+                            data_fim_tz = data_fim_tz.replace(hour=23, minute=59, second=59, microsecond=999999)
+                        
                         filtered = filtered[filtered['data'] <= data_fim_tz]
                     except Exception:
                         # Em caso de erro, usar comparação simples
                         data_fim_tz = pd.Timestamp(data_fim)
+                        
+                        # CORREÇÃO: Se mesmo dia, incluir todo o dia até 23:59:59
+                        if data_inicio and pd.Timestamp(data_inicio).date() == pd.Timestamp(data_fim).date():
+                            data_fim_tz = data_fim_tz.replace(hour=23, minute=59, second=59, microsecond=999999)
+                        
                         filtered = filtered[filtered['data'] <= data_fim_tz]
                         
             except Exception:
