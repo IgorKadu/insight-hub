@@ -61,38 +61,30 @@ def main():
     # Área de upload
     st.subheader("📤 Fazer Upload do Arquivo CSV")
     
-    uploaded_file = st.file_uploader(
-        "Selecione o arquivo CSV:",
+    uploaded_files = st.file_uploader(
+        "Selecione os arquivos CSV:",
         type=['csv'],
-        help="Arquivo CSV com dados telemáticos da frota",
-        accept_multiple_files=False
+        help="Múltiplos arquivos CSV com dados telemáticos da frota",
+        accept_multiple_files=True
     )
     
-    if uploaded_file is not None:
-        # Mostrar informações do arquivo
-        file_details = {
-            "Nome do Arquivo": uploaded_file.name,
-            "Tamanho": f"{uploaded_file.size / 1024 / 1024:.2f} MB",
-            "Tipo": uploaded_file.type
-        }
+    if uploaded_files:
+        # Mostrar informações dos arquivos
+        st.info(f"📁 **{len(uploaded_files)} arquivo(s) selecionado(s)**")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info(f"""
-            **📄 Detalhes do Arquivo:**
-            - Nome: {file_details['Nome do Arquivo']}
-            - Tamanho: {file_details['Tamanho']}
-            - Tipo: {file_details['Tipo']}
-            """)
-        
-        # Verificações iniciais
-        if uploaded_file.size > 50 * 1024 * 1024:  # 50MB
-            st.error("❌ Arquivo muito grande! Tamanho máximo: 50MB")
+        total_size = sum(f.size for f in uploaded_files)
+        if total_size > 200 * 1024 * 1024:  # 200MB total
+            st.error("❌ Total de arquivos muito grande! Tamanho máximo: 200MB")
             st.stop()
         
-        # Preview do arquivo com detecção automática de encoding
+        # Mostrar lista de arquivos
+        for i, file in enumerate(uploaded_files):
+            size_mb = file.size / 1024 / 1024
+            st.write(f"{i+1}. **{file.name}** - {size_mb:.2f} MB")
+        
+        # Preview do primeiro arquivo
         try:
-            # Tentar diferentes encodings e separadores para preview
+            first_file = uploaded_files[0]
             preview_df = None
             separators = [';', ',']
             encodings = ['latin-1', 'utf-8', 'iso-8859-1', 'windows-1252', 'cp1252']
@@ -100,53 +92,88 @@ def main():
             for sep in separators:
                 for enc in encodings:
                     try:
-                        uploaded_file.seek(0)
-                        preview_df = pd.read_csv(uploaded_file, sep=sep, encoding=enc, nrows=5)
-                        # Se chegou até aqui, deu certo
-                        st.success(f"📄 Arquivo detectado: separador '{sep}', encoding '{enc}'")
+                        first_file.seek(0)
+                        preview_df = pd.read_csv(first_file, sep=sep, encoding=enc, nrows=5)
+                        st.success(f"📄 Formato detectado: separador '{sep}', encoding '{enc}'")
                         break
                     except:
                         continue
                 if preview_df is not None:
                     break
             
-            # Se não conseguiu com nenhuma combinação, tentar leitura padrão
-            if preview_df is None:
-                uploaded_file.seek(0)
-                preview_df = pd.read_csv(uploaded_file, nrows=5)
+            if preview_df is not None:
+                st.subheader("👀 Preview dos Dados")
+                st.dataframe(preview_df, width='stretch')
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Colunas encontradas", len(preview_df.columns))
+                with col2:
+                    st.metric("Total de arquivos", len(uploaded_files))
             
-            with col2:
-                st.success(f"""
-                **✅ Preview do Arquivo:**
-                - Colunas encontradas: {len(preview_df.columns)}
-                - Registros (preview): {len(preview_df)}
-                """)
+            first_file.seek(0)
             
-            st.subheader("👀 Preview dos Dados")
-            st.dataframe(preview_df, use_container_width=True)
-            
-            # Reset do ponteiro do arquivo
-            uploaded_file.seek(0)
-            
-            # Botão para processar
-            if st.button("🚀 Processar Arquivo", type="primary", use_container_width=True):
-                process_csv_file(uploaded_file)
+            # Botão para processar todos os arquivos
+            if st.button("🚀 Processar Todos os Arquivos", type="primary"):
+                process_multiple_csv_files(uploaded_files)
                 
         except Exception as e:
-            st.error(f"❌ Erro ao ler o arquivo: {str(e)}")
+            st.error(f"❌ Erro ao ler os arquivos: {str(e)}")
     
     # Mostrar histórico de arquivos processados
     show_processing_history()
 
-def process_csv_file(uploaded_file):
-    """Processa o arquivo CSV enviado"""
+def process_multiple_csv_files(uploaded_files):
+    """Processa múltiplos arquivos CSV"""
     
-    with st.spinner("🔄 Processando arquivo..."):
-        # Inicializar processador
-        processor = CSVProcessor()
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    total_files = len(uploaded_files)
+    processed_files = 0
+    total_records = 0
+    
+    for i, uploaded_file in enumerate(uploaded_files):
+        status_text.text(f"🔄 Processando {uploaded_file.name} ({i+1}/{total_files})...")
+        progress_bar.progress((i / total_files))
         
-        # Processar arquivo
-        processed_df, errors = processor.process_csv_file(uploaded_file)
+        # Processar arquivo individual
+        result = process_single_csv_file(uploaded_file)
+        
+        if result['success']:
+            processed_files += 1
+            total_records += result.get('records_processed', 0)
+            st.success(f"✅ {uploaded_file.name}: {result.get('records_processed', 0)} registros")
+        else:
+            st.error(f"❌ {uploaded_file.name}: {result.get('error', 'Erro desconhecido')}")
+    
+    progress_bar.progress(1.0)
+    status_text.text("✅ Processamento concluído!")
+    
+    st.success(f"""
+    🎉 **Processamento concluído!**
+    - Arquivos processados: {processed_files}/{total_files}
+    - Total de registros: {total_records:,}
+    """)
+
+def process_single_csv_file(uploaded_file):
+    """Processa um único arquivo CSV"""
+    
+    try:
+        # Salvar arquivo temporário
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_path = tmp_file.name
+        
+        # Usar DatabaseManager para migrar para base de dados
+        result = DatabaseManager.migrate_csv_to_database(tmp_path)
+        
+        # Limpar arquivo temporário
+        import os
+        os.unlink(tmp_path)
+        
+        return result
         
         if errors:
             st.error("❌ Erros encontrados durante o processamento:")

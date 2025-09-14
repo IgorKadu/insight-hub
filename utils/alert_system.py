@@ -24,9 +24,16 @@ class AlertSystem:
         if df.empty:
             return alerts
         
-        # Filtrar últimas 24h
+        # Filtrar últimas 24h - timezone correto
         from datetime import timezone
         cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        # Verificar se dados têm timezone
+        if df['data'].dt.tz is not None:
+            # Se dados não estão em UTC, converter
+            if df['data'].dt.tz != timezone.utc:
+                cutoff = cutoff.astimezone(df['data'].dt.tz)
+        
         df_recent = df[df['data'] >= cutoff]
         
         # Alertas de velocidade

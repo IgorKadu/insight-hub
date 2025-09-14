@@ -57,13 +57,23 @@ class DataAnalyzer:
             filtered = filtered[filtered['placa'] == placa]
         
         if data_inicio:
-            # Garantir timezone compatível
-            data_inicio_tz = pd.Timestamp(data_inicio, tz='UTC')
+            # Converter data_inicio para o mesmo timezone dos dados
+            if filtered['data'].dt.tz is not None:
+                # Dados têm timezone, converter data_inicio
+                data_inicio_tz = pd.Timestamp(data_inicio).tz_localize('UTC')
+            else:
+                # Dados sem timezone, usar timestamp simples
+                data_inicio_tz = pd.Timestamp(data_inicio)
             filtered = filtered[filtered['data'] >= data_inicio_tz]
         
         if data_fim:
-            # Garantir timezone compatível  
-            data_fim_tz = pd.Timestamp(data_fim, tz='UTC')
+            # Converter data_fim para o mesmo timezone dos dados
+            if filtered['data'].dt.tz is not None:
+                # Dados têm timezone, converter data_fim
+                data_fim_tz = pd.Timestamp(data_fim).tz_localize('UTC')
+            else:
+                # Dados sem timezone, usar timestamp simples
+                data_fim_tz = pd.Timestamp(data_fim)
             filtered = filtered[filtered['data'] <= data_fim_tz]
         
         self.filtered_df = filtered
