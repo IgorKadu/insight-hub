@@ -31,6 +31,42 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 0.5rem 0;
     }
+    /* Substituir o texto "app" no botão de navegação por "Insight Hub" */
+    [data-testid="stSidebar"] a[href="/"] p,
+    [data-testid="stSidebar"] a[href="/?nav=wide"] p,
+    [data-testid="stSidebar"] a[data-testid="stSidebarNavLink"] p,
+    [data-testid="stSidebar"] .stSidebarNav a:first-child p {
+        font-size: 0 !important;
+        color: transparent !important;
+        position: relative;
+    }
+    [data-testid="stSidebar"] a[href="/"] p::after,
+    [data-testid="stSidebar"] a[href="/?nav=wide"] p::after,
+    [data-testid="stSidebar"] a[data-testid="stSidebarNavLink"] p::after,
+    [data-testid="stSidebar"] .stSidebarNav a:first-child p::after {
+        content: "🚛 Insight Hub";
+        font-size: 16px !important;
+        color: #262730 !important;
+        font-weight: normal;
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+    /* Seletor mais genérico para capturar o botão app */
+    [data-testid="stSidebar"] ul li:first-child a p {
+        font-size: 0 !important;
+        color: transparent !important;
+        position: relative;
+    }
+    [data-testid="stSidebar"] ul li:first-child a p::after {
+        content: "🚛 Insight Hub";
+        font-size: 16px !important;
+        color: #262730 !important;
+        font-weight: normal;
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -279,6 +315,13 @@ def main():
                 registros_por_dia = len(df) / max(1, (df['data'].max() - df['data'].min()).days)
                 st.info(f"📈 **Taxa média:** {registros_por_dia:.0f} registros/dia")
 
+# Adicionar navegação personalizada na sidebar
+with st.sidebar:
+    st.markdown("""
+        <div style="padding: 0.5rem 0; margin-bottom: 0.5rem;">
+            <h3 style="margin: 0; color: #262730; font-size: 18px;">🚛 Insight Hub</h3>
+        </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
