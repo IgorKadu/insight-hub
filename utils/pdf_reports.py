@@ -1,57 +1,146 @@
-"""Gerador de Relatórios PDF Avançado"""
+"""Gerador de Relatórios PDF Robusto e Seguro"""
 from fpdf import FPDF
 import pandas as pd
 from datetime import datetime, timedelta
-from database.db_manager import DatabaseManager
-from utils.data_analyzer import DataAnalyzer
-from utils.insights_generator import InsightsGenerator
-from utils.ml_predictive import PredictiveMaintenanceAnalyzer
 import os
+import re
 import numpy as np
+from io import BytesIO
+from typing import Dict, Any, Optional, List
 
 class PDFReportGenerator:
     def __init__(self):
         self.pdf = FPDF()
         self.pdf.set_auto_page_break(auto=True, margin=15)
+        
+        # Tentar adicionar fonte Unicode (DejaVu Sans)
+        try:
+            font_path = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts', 'DejaVuSans.ttf')
+            if os.path.exists(font_path):
+                self.pdf.add_font('DejaVu', '', font_path, uni=True)
+                self.unicode_font_available = True
+                self.default_font = 'DejaVu'
+            else:
+                self.unicode_font_available = False
+                self.default_font = 'Arial'
+        except:
+            self.unicode_font_available = False
+            self.default_font = 'Arial'
+        
         self.pdf.add_page()
-        self.pdf.set_font('Arial', 'B', 16)
+        self.pdf.set_font(self.default_font, 'B', 16)
     
-    def add_header(self, title):
+    def strip_emojis(self, text: str) -> str:
+        """Remove emojis e caracteres especiais do texto"""
+        if not text:
+            return ""
+        
+        # Mapeamento de emojis comuns para texto
+        emoji_map = {
+            '🚛': '[CAMINHAO]',
+            '📊': '[GRAFICO]',
+            '🔍': '[LUPA]',
+            '🔮': '[MANUTENCAO]',
+            '🗺️': '[MAPA]',
+            '🧠': '[INSIGHTS]',
+            '🚨': '[ALERTA]',
+            '📄': '[RELATORIO]',
+            '⚡': '[VELOCIDADE]',
+            '🏎️': '[CARRO]',
+            '🚗': '[VEICULO]',
+            '🏢': '[EMPRESA]',
+            '📅': '[DATA]',
+            '📈': '[TENDENCIA]',
+            '✅': '[OK]',
+            '❌': '[ERRO]',
+            '⚠️': '[ATENCAO]',
+            '💡': '[IDEIA]',
+            '🎯': '[META]',
+            '🔧': '[FERRAMENTA]',
+            '📡': '[GPS]',
+            '🛣️': '[ESTRADA]',
+            '🔋': '[BATERIA]'
+        }
+        
+        # Substituir emojis conhecidos
+        for emoji, replacement in emoji_map.items():
+            text = text.replace(emoji, replacement)
+        
+        # Remover emojis restantes (caracteres Unicode > 127 que não são acentos latinos)
+        text = re.sub(r'[^\x00-\xFF\u00C0-\u00FF]+', '', text)
+        
+        return text
+    
+    def safe_text(self, text: str) -> str:
+        """Converte texto para formato seguro para PDF"""
+        if not text:
+            return ""
+        
+        text = self.strip_emojis(str(text))
+        
+        # Se fonte Unicode não disponível, converter caracteres especiais
+        if not self.unicode_font_available:
+            text = text.encode('latin-1', 'replace').decode('latin-1')
+        
+        return text
+    
+    def add_header(self, title: str):
         """Adiciona cabeçalho da seção"""
         self.pdf.set_fill_color(230, 230, 230)
-        self.pdf.set_font('Arial', 'B', 14)
-        self.pdf.cell(0, 10, title, 0, 1, 'L', True)
+        self.pdf.set_font(self.default_font, 'B', 14)
+        safe_title = self.safe_text(title)
+        self.pdf.cell(0, 10, safe_title, 0, 1, 'L', True)
         self.pdf.ln(5)
     
-    def add_subsection(self, title):
+    def add_subsection(self, title: str):
         """Adiciona subtítulo"""
-        self.pdf.set_font('Arial', 'B', 12)
-        self.pdf.cell(0, 8, title, 0, 1, 'L')
+        self.pdf.set_font(self.default_font, 'B', 12)
+        safe_title = self.safe_text(title)
+        self.pdf.cell(0, 8, safe_title, 0, 1, 'L')
         self.pdf.ln(3)
     
-    def add_metric(self, label, value, unit=""):
+    def add_metric(self, label: str, value: str, unit: str = ""):
         """Adiciona métrica formatada"""
-        self.pdf.set_font('Arial', '', 10)
-        self.pdf.cell(100, 6, f'{label}:', 0, 0, 'L')
-        self.pdf.set_font('Arial', 'B', 10)
-        self.pdf.cell(0, 6, f'{value} {unit}', 0, 1, 'L')
+        self.pdf.set_font(self.default_font, '', 10)
+        safe_label = self.safe_text(label)
+        self.pdf.cell(100, 6, f'{safe_label}:', 0, 0, 'L')
+        self.pdf.set_font(self.default_font, 'B', 10)
+        safe_value = self.safe_text(str(value))
+        safe_unit = self.safe_text(unit)
+        self.pdf.cell(0, 6, f'{safe_value} {safe_unit}', 0, 1, 'L')
     
-    def add_table_header(self, headers):
+    def add_table_header(self, headers: List[str]):
         """Adiciona cabeçalho de tabela"""
-        self.pdf.set_font('Arial', 'B', 9)
+        self.pdf.set_font(self.default_font, 'B', 9)
         self.pdf.set_fill_color(200, 200, 200)
         col_width = 190 / len(headers)
         for header in headers:
-            self.pdf.cell(col_width, 8, str(header), 1, 0, 'C', True)
+            safe_header = self.safe_text(str(header))
+            self.pdf.cell(col_width, 8, safe_header, 1, 0, 'C', True)
         self.pdf.ln()
     
-    def add_table_row(self, data):
+    def add_table_row(self, data: List[str]):
         """Adiciona linha de tabela"""
-        self.pdf.set_font('Arial', '', 8)
+        self.pdf.set_font(self.default_font, '', 8)
         col_width = 190 / len(data)
         for item in data:
-            self.pdf.cell(col_width, 6, str(item), 1, 0, 'C')
+            safe_item = self.safe_text(str(item))
+            # Truncar itens muito longos para caber na célula
+            if len(safe_item) > 20:
+                safe_item = safe_item[:17] + "..."
+            self.pdf.cell(col_width, 6, safe_item, 1, 0, 'C')
         self.pdf.ln()
+    
+    def safe_date_format(self, date_value: Any, format_str: str = "%d/%m/%Y") -> str:
+        """Formata data de forma segura"""
+        try:
+            if pd.isna(date_value):
+                return "N/A"
+            if isinstance(date_value, str):
+                date_value = pd.to_datetime(date_value, errors='coerce')
+            return date_value.strftime(format_str)
+        except:
+            return "N/A"
     
     def generate_comprehensive_report(self, output_path: str = "relatorio_completo_frota.pdf") -> str:
         """Gera relatório completo integrando dados de todos os painéis"""
@@ -326,157 +415,122 @@ class PDFReportGenerator:
             # 5. ANÁLISE OPERACIONAL
             self.add_header('5. ANÁLISE OPERACIONAL')
             
-            # Status operacional
-            ignition_stats = df['ignicao'].value_counts() if 'ignicao' in df.columns else {}
-            blocked_stats = df['bloqueado'].value_counts() if 'bloqueado' in df.columns else {}
+            # Rodapé
+            self.pdf.set_font(self.default_font, 'I', 8)
+            footer_text = f'Relatorio gerado em {datetime.now().strftime("%d/%m/%Y as %H:%M:%S")} - Insight Hub Fleet Monitor'
+            self.pdf.cell(0, 6, self.safe_text(footer_text), 0, 1, 'C')
             
-            self.add_subsection('Status dos Veículos:')
-            if 'ligado' in ignition_stats.index or 'desligado' in ignition_stats.index:
-                self.add_metric('Veículos com Ignição Ligada', f'{ignition_stats.get("ligado", 0):,}')
-                self.add_metric('Veículos com Ignição Desligada', f'{ignition_stats.get("desligado", 0):,}')
+            # Gerar PDF como bytes
+            buffer = BytesIO()
+            self.pdf.output(buffer)
             
-            if 'sim' in blocked_stats.index or 'não' in blocked_stats.index:
-                self.add_metric('Veículos Bloqueados', f'{blocked_stats.get("sim", 0):,}')
-                self.add_metric('Veículos Desbloqueados', f'{blocked_stats.get("não", 0):,}')
+            # Gerar nome do arquivo
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f'relatorio_frota_{timestamp}.pdf'
             
-            # Análise temporal
-            df['hora'] = df['data'].dt.hour
-            peak_hour = df.groupby('hora').size().idxmax()
-            peak_count = df.groupby('hora').size().max()
-            
-            self.add_subsection('Padrões de Uso:')
-            self.add_metric('Horário de Pico', f'{peak_hour}:00 - {peak_hour+1}:00')
-            self.add_metric('Atividade no Pico', f'{peak_count:,} registros')
-            self.pdf.ln(5)
-            
-            # 6. ANÁLISE DE EFICIÊNCIA
-            self.add_header('6. ANÁLISE DE EFICIÊNCIA ENERGÉTICA')
-            
-            if 'bateria' in df.columns:
-                battery_avg = df['bateria'].mean()
-                battery_low = len(df[df['bateria'] < 12.0])
-                self.add_metric('Nível Médio de Bateria', f'{battery_avg:.1f}V')
-                self.add_metric('Alertas de Bateria Baixa', f'{battery_low:,}')
-            
-            # Eficiência por veículo
-            efficiency_stats = df.groupby('placa').agg({
-                'velocidade_km': 'mean',
-                'odometro_periodo_km': 'sum'
-            }).round(2)
-            
-            # Top 5 mais eficientes (maior distância, menor velocidade média)
-            efficiency_stats['score'] = efficiency_stats['odometro_periodo_km'] / (efficiency_stats['velocidade_km'] + 1)
-            top_efficient = efficiency_stats.nlargest(5, 'score')
-            
-            self.add_subsection('Top 5 Veículos Mais Eficientes:')
-            self.add_table_header(['Placa', 'Distância Total', 'Vel. Média', 'Score'])
-            for placa in top_efficient.index:
-                data = [
-                    placa,
-                    f"{top_efficient.loc[placa, 'odometro_periodo_km']:.1f} km",
-                    f"{top_efficient.loc[placa, 'velocidade_km']:.1f} km/h",
-                    f"{top_efficient.loc[placa, 'score']:.2f}"
-                ]
-                self.add_table_row(data)
-            self.pdf.ln(5)
-            
-            # 7. INSIGHTS INTELIGENTES E OPORTUNIDADES
-            self.add_header('7. INSIGHTS INTELIGENTES E OPORTUNIDADES DE MELHORIA')
-            
-            # Categorizar insights por tipo
-            opportunities = [i for i in insights if i['type'] == 'info' and 'oportunidade' in i.get('description', '').lower()]
-            warnings = [i for i in insights if i['type'] == 'warning']
-            successes = [i for i in insights if i['type'] == 'success']
-            
-            if opportunities:
-                self.add_subsection('🎯 Oportunidades de Otimização:')
-                for opp in opportunities[:4]:  # Top 4 oportunidades
-                    self.pdf.set_font('Arial', '', 9)
-                    self.pdf.cell(0, 5, f"• {opp.get('recommendation', opp['description'])}"[:85], 0, 1)
-            
-            if warnings:
-                self.add_subsection('⚠️ Pontos de Atenção:')
-                for warn in warnings[:4]:  # Top 4 warnings
-                    self.pdf.set_font('Arial', '', 9)
-                    self.pdf.cell(0, 5, f"• {warn.get('recommendation', warn['description'])}"[:85], 0, 1)
-            
-            if successes:
-                self.add_subsection('✅ Pontos Positivos:')
-                for success in successes[:3]:  # Top 3 sucessos
-                    self.pdf.set_font('Arial', '', 9)
-                    self.pdf.cell(0, 5, f"• {success['description']}"[:85], 0, 1)
-            
-            self.pdf.ln(5)
-            
-            # 8. PLANO DE AÇÃO E RECOMENDAÇÕES
-            self.add_header('8. PLANO DE AÇÃO E RECOMENDAÇÕES')
-            
-            self.pdf.set_font('Arial', '', 10)
-            
-            # Recomendações baseadas nos insights e análises
-            recommendations = []
-            
-            # Recomendações baseadas nos insights automáticos
-            for insight in insights:
-                if insight.get('recommendation') and insight['type'] in ['error', 'warning']:
-                    recommendations.append(f"• {insight['recommendation']}")
-            
-            # Recomendações baseadas na análise preditiva
-            if predictive_results and predictive_results.get('recommendations'):
-                for rec in predictive_results['recommendations'][:2]:
-                    recommendations.append(f"• Manutenção: {rec}")
-            
-            # Recomendações específicas baseadas nos dados
-            violations = df[df['velocidade_km'] > 80] if 'velocidade_km' in df.columns else pd.DataFrame()
-            if len(violations) > total_records * 0.1:
-                recommendations.append("• Implementar treinamento de condução defensiva para reduzir violações de velocidade")
-            
-            if gps_coverage < 95:
-                recommendations.append("• Verificar sistema GPS dos veículos com baixa cobertura")
-            
-            # Adicionar recomendação sobre manutenção preditiva se aplicável
-            if predictive_results and predictive_results.get('maintenance_alerts'):
-                recommendations.append(f"• Agendar manutenção preventiva para {len(predictive_results['maintenance_alerts'])} veículos")
-            
-            # Se não há recomendações específicas, adicionar padrões
-            if not recommendations or len([r for r in recommendations if not r.startswith('•')]) == 0:
-                recommendations.extend([
-                    "• Frota operando dentro dos parâmetros esperados",
-                    "• Continuar monitoramento regular através do Insight Hub",
-                    "• Revisar relatórios mensalmente para identificar tendências"
-                ])
-            
-            for rec in recommendations:
-                self.pdf.cell(0, 6, rec.encode('latin-1', 'replace').decode('latin-1'), 0, 1)
-            
-            self.pdf.ln(8)
-            
-            # Resumo final dos painéis analisados
-            self.add_header('RESUMO DOS PAINÉIS ANALISADOS')
-            self.pdf.set_font('Arial', '', 9)
-            self.pdf.cell(0, 5, '✓ Análise Detalhada: KPIs, métricas operacionais e padrões temporais', 0, 1)
-            self.pdf.cell(0, 5, '✓ Manutenção Preditiva: Health scores, alertas e detecção de anomalias', 0, 1)
-            self.pdf.cell(0, 5, '✓ Insights Automáticos: Recomendações inteligentes e alertas críticos', 0, 1)
-            self.pdf.cell(0, 5, '✓ Análise Geográfica: Padrões de rota e distribuição espacial', 0, 1)
-            self.pdf.cell(0, 5, '✓ Controle Operacional: Conformidade e monitoramento regulatório', 0, 1)
-            
-            self.pdf.ln(8)
-            
-            # Rodapé aprimorado
-            self.pdf.set_font('Arial', 'I', 8)
-            self.pdf.cell(0, 5, f'Relatório Integrado gerado pelo Insight Hub - {datetime.now().strftime("%d/%m/%Y às %H:%M:%S")}', 0, 1, 'C')
-            self.pdf.cell(0, 5, 'Dados consolidados de 5 painéis analíticos com IA e Machine Learning', 0, 1, 'C')
-            
-            # Salvar PDF
-            self.pdf.output(output_path)
-            return output_path
+            return {
+                'success': True,
+                'pdf_bytes': buffer.getvalue(),
+                'filename': filename,
+                'total_records': total_records,
+                'total_vehicles': total_vehicles,
+                'total_clients': total_clients
+            }
             
         except Exception as e:
-            # Em caso de erro, criar relatório básico
-            self.pdf.cell(0, 10, f'Erro ao gerar relatório detalhado: {str(e)}', 0, 1)
-            self.pdf.output(output_path)
-            return output_path
+            # Em caso de erro, retornar PDF de erro
+            try:
+                error_buffer = BytesIO()
+                error_pdf = FPDF()
+                error_pdf.add_page()
+                error_pdf.set_font('Arial', 'B', 16)
+                error_pdf.cell(0, 10, 'ERRO NA GERACAO DO RELATORIO', 0, 1, 'C')
+                error_pdf.ln(10)
+                error_pdf.set_font('Arial', '', 12)
+                error_pdf.cell(0, 10, f'Erro: {str(e)[:100]}', 0, 1, 'C')
+                error_pdf.output(error_buffer)
+                
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'pdf_bytes': error_buffer.getvalue(),
+                    'filename': 'relatorio_erro.pdf'
+                }
+            except:
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'pdf_bytes': b'',
+                    'filename': 'relatorio_erro.pdf'
+                }
     
     def generate_fleet_report(self, output_path: str = "relatorio_frota.pdf") -> str:
-        """Mantém compatibilidade - chama relatório completo"""
-        return self.generate_comprehensive_report(output_path)
+        """Método de compatibilidade para gerar relatório básico sem contextos"""
+        try:
+            from database.db_manager import DatabaseManager
+            
+            # Carregar dados
+            df = DatabaseManager.get_dashboard_data()
+            
+            if df.empty:
+                self.pdf.set_font(self.default_font, '', 12)
+                self.pdf.cell(0, 10, 'Nenhum dado disponivel para gerar relatorio', 0, 1, 'C')
+                self.pdf.output(output_path)
+                return output_path
+            
+            # Criar contextos vazios para o método principal
+            empty_contexts = {
+                'kpis': {},
+                'insights': [],
+                'predictive': {'status': 'skipped', 'reason': 'Modo compatibilidade'},
+                'routes': {},
+                'operational': {},
+                'compliance': {}
+            }
+            
+            options = {'include_charts': False, 'report_type': 'Relatorio Basico'}
+            result = self.generate_comprehensive_report(df, empty_contexts, options)
+            
+            if result['success']:
+                # Salvar arquivo
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, 'wb') as f:
+                    f.write(result['pdf_bytes'])
+                return output_path
+            else:
+                # Gerar relatório básico em caso de erro
+                self.pdf.set_font(self.default_font, 'B', 16)
+                self.pdf.cell(0, 10, 'RELATORIO DA FROTA', 0, 1, 'C')
+                self.pdf.ln(10)
+                
+                self.pdf.set_font(self.default_font, '', 12)
+                self.pdf.cell(0, 8, f'Data: {datetime.now().strftime("%d/%m/%Y")}', 0, 1)
+                self.pdf.cell(0, 8, f'Total de registros: {len(df):,}', 0, 1)
+                self.pdf.cell(0, 8, f'Veiculos: {df["placa"].nunique() if "placa" in df.columns else 0}', 0, 1)
+                self.pdf.cell(0, 8, f'Clientes: {df["cliente"].nunique() if "cliente" in df.columns else 0}', 0, 1)
+                
+                if 'velocidade_km' in df.columns:
+                    self.pdf.cell(0, 8, f'Velocidade media: {df["velocidade_km"].mean():.1f} km/h', 0, 1)
+                
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                self.pdf.output(output_path)
+                return output_path
+            
+        except Exception as e:
+            # Relatório de erro mínimo
+            try:
+                self.pdf.set_font('Arial', 'B', 14)
+                self.pdf.cell(0, 10, 'ERRO NO RELATORIO', 0, 1, 'C')
+                self.pdf.ln(5)
+                self.pdf.set_font('Arial', '', 10)
+                error_msg = f'Erro: {str(e)[:50]}'
+                self.pdf.cell(0, 8, error_msg, 0, 1)
+                
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                self.pdf.output(output_path)
+                return output_path
+            except:
+                # Último recurso - criar arquivo vazio
+                with open(output_path, 'w') as f:
+                    f.write('Erro na geracao do relatorio PDF')
+                return output_path

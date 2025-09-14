@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from database.db_manager import DatabaseManager
 from utils.pdf_reports import PDFReportGenerator
 from utils.data_analyzer import DataAnalyzer
+from utils.report_aggregator import ReportDataAggregator
 import os
 
 st.set_page_config(page_title="Relatórios", page_icon="📄", layout="wide")
@@ -513,42 +514,119 @@ def show_advanced_settings():
         st.selectbox("🔤 Idioma:", ["Português", "English", "Español"])
 
 def show_download_options(df, summary, analyzer, tipo_relatorio, formato_saida, incluir_graficos):
-    """Opções de download do relatório"""
+    """Opções de download do relatório robusto"""
     st.subheader("📥 Download do Relatório")
     
     # Informações do relatório a ser gerado
     st.markdown(f"**📊 Tipo:** {tipo_relatorio}")
     st.markdown(f"**📄 Formato:** {formato_saida}")
     st.markdown(f"**📅 Período:** {len(df):,} registros")
-    st.markdown(f"**🚗 Veículos:** {df['placa'].nunique()}")
+    st.markdown(f"**🚗 Veículos:** {df['placa'].nunique() if 'placa' in df.columns else 0}")
+    
+    # Salvar filtros no session state para o agregador
+    periodo_dias = periodo_opcoes.get(periodo_selecionado)
+    st.session_state['report_period_days'] = periodo_dias
+    st.session_state['report_client_filter'] = None  # Pode ser expandido no futuro
+    st.session_state['report_vehicle_filter'] = None  # Pode ser expandido no futuro
     
     # Botões de geração
     col1, col2, col3 = st.columns(3)
     
     with col1:
         if st.button("📄 Gerar PDF Profissional", type="primary"):
-            with st.spinner("🔄 Gerando relatório PDF..."):
+            with st.spinner("🔄 Gerando relatório PDF robusto..."):
                 try:
-                    generator = PDFReportGenerator()
-                    # Usar método existente até implementar o avançado
-                    pdf_path = generator.generate_fleet_report()
+                    # Usar o novo sistema robusto
+                    aggregator = ReportDataAggregator()
                     
-                    if os.path.exists(pdf_path):
-                        with open(pdf_path, "rb") as file:
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            filename = f"relatorio_{tipo_relatorio.split()[1].lower()}_{timestamp}.pdf"
-                            
+                    # Capturar filtros
+                    filters = aggregator.capture_filter_state()
+                    
+                    # Aplicar filtros nos dados
+                    filtered_df = aggregator.get_filtered_df(df, filters)
+                    
+                    if filtered_df.empty:
+                        st.warning("⚠️ Nenhum dado disponível com os filtros aplicados.")
+                        return
+                    
+                    # Construir contextos de todos os painéis
+                    with st.spinner("📊 Analisando dados de todos os painéis..."):
+                        contexts = aggregator.build_contexts(filtered_df)
+                    
+                    # Configurar opções do relatório
+                    options = {
+                        'include_charts': incluir_graficos,
+                        'report_type': tipo_relatorio
+                    }
+                    
+                    # Gerar PDF robusto
+                    with st.spinner("📄 Gerando PDF..."):
+                        generator = PDFReportGenerator()
+                        result = generator.generate_comprehensive_report(filtered_df, contexts, options)
+                    
+                    if result['success']:
+                        # Oferecer download direto
+                        st.download_button(
+                            label="⬇️ Baixar PDF Consolidado",
+                            data=result['pdf_bytes'],
+                            file_name=result['filename'],
+                            mime="application/pdf"
+                        )
+                        
+                        # Mostrar estatísticas do relatório
+                        st.success("✅ Relatório PDF gerado com sucesso!")
+                        col_stat1, col_stat2, col_stat3 = st.columns(3)
+                        with col_stat1:
+                            st.metric("📊 Registros", f"{result.get('total_records', 0):,}")
+                        with col_stat2:
+                            st.metric("🚗 Veículos", result.get('total_vehicles', 0))
+                        with col_stat3:
+                            st.metric("🏢 Clientes", result.get('total_clients', 0))
+                        
+                        # Status dos painéis incluídos
+                        st.markdown("### 📋 Painéis Incluídos no Relatório:")
+                        st.markdown("✅ Análise Detalhada - KPIs e métricas principais")
+                        
+                        insights_count = len(contexts.get('insights', []))
+                        st.markdown(f"✅ Insights Automáticos - {insights_count} insights gerados")
+                        
+                        predictive_status = contexts.get('predictive', {}).get('status', 'skipped')
+                        if predictive_status == 'success':
+                            st.markdown("✅ Manutenção Preditiva - Análise completa")
+                        else:
+                            reason = contexts.get('predictive', {}).get('reason', 'N/A')
+                            st.markdown(f"⚠️ Manutenção Preditiva - {reason}")
+                        
+                        routes_coords = contexts.get('routes', {}).get('total_valid_coords', 0)
+                        if routes_coords > 0:
+                            st.markdown(f"✅ Análise Geográfica - {routes_coords:,} pontos GPS")
+                        else:
+                            st.markdown("⚠️ Análise Geográfica - Dados de localização limitados")
+                        
+                        compliance_rate = contexts.get('compliance', {}).get('compliance_rate')
+                        if compliance_rate is not None:
+                            st.markdown(f"✅ Conformidade Operacional - {compliance_rate:.1f}% conformidade")
+                        else:
+                            st.markdown("⚠️ Conformidade Operacional - Análise básica")
+                        
+                    else:
+                        st.error(f"❌ Erro ao gerar relatório: {result.get('error', 'Erro desconhecido')}")
+                        
+                        # Oferecer PDF de erro se disponível
+                        if result.get('pdf_bytes'):
                             st.download_button(
-                                label="⬇️ Baixar PDF",
-                                data=file.read(),
-                                file_name=filename,
+                                label="📄 Baixar Relatório de Erro",
+                                data=result['pdf_bytes'],
+                                file_name=result.get('filename', 'relatorio_erro.pdf'),
                                 mime="application/pdf"
                             )
-                        st.success("✅ Relatório PDF gerado com sucesso!")
-                    else:
-                        st.error("❌ Erro ao gerar relatório PDF")
+                            
                 except Exception as e:
-                    st.error(f"❌ Erro: {str(e)}")
+                    st.error(f"❌ Erro crítico na geração do relatório: {str(e)}")
+                    
+                    # Log de debug para desenvolvimento
+                    if st.checkbox("🔧 Mostrar detalhes técnicos do erro", key="debug_pdf"):
+                        st.code(f"Erro: {str(e)}\n\nTipo: {type(e).__name__}")
     
     with col2:
         if st.button("📊 Exportar Dados CSV"):
@@ -575,7 +653,8 @@ def show_download_options(df, summary, analyzer, tipo_relatorio, formato_saida, 
 
 # ========== SEÇÃO PRINCIPAL - EXECUTADA APÓS DEFINIÇÕES ==========
 # Seção principal de geração de relatórios
-st.header("📊 Geração de Relatórios")
+st.header("📊 Geração de Relatórios Robustos")
+st.markdown("**🚀 Sistema aprimorado com correções de Unicode/emoji e integração completa entre painéis**")
 
 # Tabs para diferentes visualizações
 tab1, tab2, tab3, tab4 = st.tabs(["📋 Pré-visualização", "📊 Dashboard", "⚙️ Configurações", "📥 Download"])
