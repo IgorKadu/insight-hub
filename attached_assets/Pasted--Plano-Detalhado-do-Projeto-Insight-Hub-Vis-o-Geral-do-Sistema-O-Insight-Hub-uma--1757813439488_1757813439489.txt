@@ -1,0 +1,260 @@
+# Plano Detalhado do Projeto Insight Hub
+
+## 🎯 Visão Geral do Sistema
+
+O **Insight Hub** é uma plataforma completa de monitoramento e análise de frotas veiculares municipais que processa dados telemáticos em tempo real para fornecer insights inteligentes sobre performance, conformidade, segurança e eficiência operacional.
+
+### 🏗️ Arquitetura Atual
+
+**Frontend:**
+- React 18 com TypeScript
+- Vite como bundler e dev server
+- Tailwind CSS para estilização moderna
+- Supabase para autenticação e dados
+- React Query para gerenciamento de estado
+
+**Backend:**
+- FastAPI (Python) - APIs RESTful padronizadas
+- PostgreSQL via Supabase
+- Sistema de processamento de CSV
+- Geração automática de insights
+
+**Infraestrutura:**
+- Supabase como BaaS (Backend as a Service)
+- Sistema de upload e processamento de arquivos
+- Armazenamento interno em JSON/MD
+- Monitoramento de performance integrado
+
+## ✅ Funcionalidades Já Implementadas
+
+### 📊 Dashboard Interativo
+- **KPIs em Tempo Real**: Métricas principais de frota (tempo ativo, distância, consumo)
+- **Gráficos Interativos**: Visualizações de performance com filtros dinâmicos
+- **Responsividade**: Interface adaptada para desktop, tablet e mobile
+- **Sistema Multi-Cliente**: Suporte dinâmico a qualquer cliente baseado nos dados do CSV
+
+### 📁 Sistema de Upload e Processamento
+- **Upload de CSV**: Processamento de arquivos com até 50MB
+- **Validação Automática**: 25 campos específicos validados
+- **Processamento em Lote**: Até 100.000 registros por arquivo
+- **Histórico de Uploads**: Rastreamento completo de arquivos processados
+
+### 🔍 Sistema de Filtros Avançados
+- **Filtros por Cliente**: Sistema dinâmico baseado nos clientes presentes nos dados
+- **Filtros Temporais**: Períodos customizáveis
+- **Filtros por Veículo**: Análise específica por placa
+- **Comparação de Veículos**: Sistema de comparação entre múltiplos veículos
+
+### 🧠 Geração Automática de Insights
+- **Análise de Compliance**: Verificação automática de conformidade
+- **Insights Preditivos**: Análises baseadas em padrões históricos
+- **Relatórios Automatizados**: Geração de relatórios em PDF
+- **Métricas de Eficiência**: Análise de performance operacional
+
+## 🔄 Funcionalidades em Desenvolvimento
+
+### 📦 Sistema de Coleta Automática
+- **Status**: 80% completo
+- **Funcionalidade**: Coleta automática de dados do Supabase
+- **Armazenamento**: Sistema interno em JSON/MD
+- **Organização**: Estrutura hierárquica por cliente/placa
+
+### 🗂️ Gerenciamento de Dados
+- **Status**: 70% completo
+- **Limpeza de Dados**: Botões para deletar dados do Supabase
+- **Arquivos Internos**: Sistema de limpeza de arquivos locais
+- **Interface**: Painel de gerenciamento de dados
+
+## 📋 Funcionalidades Pendentes
+
+### 🔧 Otimizações de Performance
+- **Caching Inteligente**: Sistema de cache para consultas frequentes
+- **Lazy Loading**: Carregamento sob demanda de dados
+- **Compressão**: Otimização de arquivos e imagens
+
+### 📚 Documentação e Testes
+- **Manual de Usuário**: Documentação completa de uso
+- **Testes Unitários**: Cobertura de testes para componentes
+- **Testes E2E**: Testes de integração completos
+
+### 🚀 Funcionalidades Futuras
+- **Alertas em Tempo Real**: Notificações de anomalias
+- **Machine Learning**: Predições avançadas de manutenção
+- **API Pública**: Endpoints para integração externa
+
+## 📋 Estrutura de Dados do Sistema
+
+### 📄 Estrutura do Arquivo CSV de Entrada
+
+O sistema processa arquivos CSV com a seguinte estrutura de 25 campos:
+
+1. **Cliente** (texto) - Nome do cliente/empresa
+2. **Placa** (texto) - Placa do veículo
+3. **Ativo** (texto) - Identificador do ativo
+4. **Data** (data/hora) - Data/hora do evento
+5. **Data (GPRS)** (data/hora) - Data/hora de comunicação GPRS
+6. **Velocidade (Km)** (inteiro) - Velocidade em km/h
+7. **Ignição** (texto curto) - Status da ignição (D/L)
+8. **Motorista** (texto) - Identificação do motorista
+9. **GPS** (inteiro booleano: 0/1) - Status do GPS
+10. **Gprs** (inteiro booleano: 0/1) - Status do GPRS
+11. **Localização** (texto longo) - Coordenadas do veículo
+12. **Endereço** (texto longo) - Endereço convertido
+13. **Tipo do Evento** (texto) - Tipo do evento registrado
+14. **Cerca** (texto) - Informações de cerca eletrônica
+15. **Saida** (texto) - Status das saídas digitais
+16. **Entrada** (texto) - Status das entradas digitais
+17. **Pacote** (texto) - Informações de pacotes de dados
+18. **Odômetro do período (Km)** (numérico decimal) - Km percorridos
+19. **Horímetro do período** (tempo HH:MM:SS) - Tempo de funcionamento
+20. **Horímetro embarcado** (tempo HH:MM:SS) - Contador de horas
+21. **Odômetro embarcado (Km)** (decimal) - Odômetro embarcado
+22. **Bateria** (texto curto) - Nível de bateria (ex: 100%)
+23. **Imagem** (texto/link/vazio) - Link para imagem se houver
+24. **Tensão** (decimal) - Tensão elétrica
+25. **Bloqueado** (inteiro booleano: 0/1) - Status de bloqueio
+
+### 🗄️ Estrutura das Tabelas no Supabase
+
+#### 📌 Tabela `historico_posicoes`
+- **id** (int) - Identificador único do registro
+- **cliente** (string) - Nome do cliente associado
+- **placa** (string) - Placa do veículo
+- **ativo** (string) - Identificador do ativo
+- **data** (timestamp) - Data/hora do evento
+- **data_gprs** (timestamp) - Data/hora de comunicação GPRS
+- **velocidade_km** (int/float) - Velocidade em km/h
+- **ignicao** (string: "L"/"D") - Status da ignição
+- **motorista** (string) - Identificação do motorista
+- **gps** (boolean) - Status do GPS
+- **gprs** (boolean) - Status do GPRS
+- **localizacao** (string: lat,long) - Coordenadas
+- **endereco** (string) - Endereço convertido
+- **tipo_evento** (string) - Tipo do evento
+- **cerca** (string) - Informação de cerca eletrônica
+- **saida** (string) - Status das saídas digitais
+- **entrada** (string) - Status das entradas digitais
+- **pacote** (string) - Informações de pacotes
+- **odometro_periodo_km** (float) - Km percorridos no período
+- **horimetro_periodo** (float) - Tempo de funcionamento (h)
+- **horimetro_embarcado** (string) - Contador de horas
+- **odometro_embarcado_km** (float) - Odômetro embarcado
+- **bateria** (string) - Nível de bateria
+- **imagem** (nullable) - Link para imagem
+- **tensao** (float/string) - Tensão elétrica
+- **bloqueado** (boolean) - Status de bloqueio
+- **batch_id** (uuid) - Identificador do lote
+- **upload_timestamp** (timestamp) - Data/hora do upload
+
+#### 📌 Tabela `uploaded_files`
+- **id** (uuid) - Identificador do arquivo
+- **cliente** (string) - Cliente vinculado ao arquivo
+- **filename** (string) - Nome do arquivo
+- **upload_timestamp** (timestamp) - Data/hora do upload
+- **total_records** (int) - Total de registros
+- **processed_records** (int) - Registros processados
+- **status** (string) - Status do processamento
+- **created_at** (timestamp) - Data/hora de criação
+
+## 🔄 Fluxo de Dados do Sistema
+
+O sistema segue um fluxo estruturado para processamento de dados:
+
+### 1️⃣ **Upload e Validação**
+- Upload de arquivo CSV através da interface web
+- Validação automática dos 25 campos obrigatórios
+- Verificação de integridade e formato dos dados
+- Criação de registro na tabela `uploaded_files`
+
+### 2️⃣ **Processamento e Armazenamento**
+- Processamento em lote dos registros do CSV
+- Inserção dos dados na tabela `historico_posicoes` do Supabase
+- Geração de `batch_id` para rastreamento
+- Atualização do status de processamento
+
+### 3️⃣ **Coleta e Organização Interna**
+- Coleta automática dos dados do Supabase
+- Organização hierárquica por cliente/placa
+- Armazenamento interno em estrutura JSON/MD
+- Criação de memória local para acesso rápido
+
+### 4️⃣ **Análise e Insights**
+- Aplicação de filtros dinâmicos nos dados
+- Geração automática de insights baseados nos padrões
+- Criação de visualizações interativas
+- Exportação de relatórios em PDF
+
+### 🎯 Vantagens desta Arquitetura
+- **Escalabilidade**: Suporte a qualquer cliente sem modificação de código
+- **Performance**: Armazenamento local para consultas rápidas
+- **Flexibilidade**: Filtros dinâmicos baseados nos dados reais
+- **Rastreabilidade**: Histórico completo de uploads e processamentos
+- **Confiabilidade**: Validação rigorosa em múltiplas camadas
+
+## 🎯 Propósito do Sistema
+
+O **Insight Hub** foi desenvolvido para resolver problemas críticos no gerenciamento de frotas municipais:
+
+### 🚛 Problemas Resolvidos
+- **Falta de Visibilidade**: Monitoramento em tempo real da frota
+- **Ineficiência Operacional**: Identificação de padrões de uso inadequado
+- **Compliance**: Verificação automática de conformidade regulatória
+- **Manutenção Reativa**: Predição de necessidades de manutenção
+- **Relatórios Manuais**: Automatização de relatórios gerenciais
+
+### 🎯 Objetivos Principais
+1. **Reduzir Custos Operacionais** em até 25%
+2. **Aumentar Eficiência** da frota municipal
+3. **Melhorar Compliance** regulatório
+4. **Otimizar Rotas** e consumo de combustível
+5. **Predizer Manutenções** preventivas
+
+## 📊 Status Atual do Projeto
+
+### ✅ Completamente Implementado (100%)
+- Sistema de upload e processamento de CSV
+- Dashboard interativo com KPIs
+- Filtros avançados por cliente, período e veículo
+- Geração automática de insights
+- Comparação entre veículos
+- Exportação de relatórios em PDF
+- Integração completa com Supabase
+- Interface responsiva e moderna
+
+### 🔄 Em Desenvolvimento (75%)
+- Sistema de coleta automática de dados
+- Armazenamento interno estruturado
+- Gerenciamento avançado de dados
+- Otimizações de performance
+
+### 📋 Planejado para Próximas Versões
+- Alertas em tempo real
+- Machine Learning para predições
+- API pública para integrações
+- Mobile app nativo
+- Módulo de manutenção preditiva
+
+## 🚀 Próximos Passos Prioritários
+
+### Curto Prazo (1-2 semanas)
+1. **Finalizar Sistema de Coleta**: Completar coleta automática do Supabase
+2. **Implementar Armazenamento**: Estrutura hierárquica de dados
+3. **Testes de Integração**: Validação completa do sistema
+
+### Médio Prazo (1 mês)
+1. **Otimizações de Performance**: Cache e lazy loading
+2. **Documentação Completa**: Manual de usuário
+3. **Testes E2E**: Cobertura completa de testes
+
+### Longo Prazo (3-6 meses)
+1. **Funcionalidades de IA**: Machine Learning integrado
+2. **API Pública**: Endpoints para terceiros
+3. **Mobile App**: Aplicativo nativo
+
+---
+
+**Status Geral**: O projeto está **85% completo** com todas as funcionalidades core implementadas e funcionais. O sistema já está pronto para uso em produção, com melhorias contínuas sendo desenvolvidas.
+
+---
+
+⚠️ **Nota Importante**: Todo o projeto deve ser totalmente configurado e construído usando **PT-BR (Português - Brasil)** como idioma padrão para configuração, código-fonte e documentação.
