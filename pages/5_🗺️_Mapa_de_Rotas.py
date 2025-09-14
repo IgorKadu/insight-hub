@@ -8,8 +8,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from database.db_manager import DatabaseManager
 from utils.data_analyzer import DataAnalyzer
-import folium
-from streamlit_folium import st_folium
+import pydeck as pdk
 
 st.set_page_config(page_title="Mapa de Rotas", page_icon="🗺️", layout="wide")
 st.title("🗺️ Mapa de Rotas")
@@ -135,59 +134,132 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("🗺️ Mapa Interativo de Trajetos")
     
-    col1, col2 = st.columns([3, 1])
+    # Opções de visualização
+    col_controls = st.columns([2, 1, 1])
+    with col_controls[0]:
+        view_mode = st.radio(
+            "Modo de Visualização:",
+            options=["Pontos Individuais", "Densidade (Hexágonos)"],
+            horizontal=True,
+            help="Pontos para datasets pequenos, Hexágonos para otimizar performance com muitos dados"
+        )
     
-    with col1:
-        if not route_data.empty and len(route_data) > 0:
-            # Criar mapa Folium
-            center_lat = route_data['latitude'].mean()
-            center_lon = route_data['longitude'].mean()
-            
-            m = folium.Map(
-                location=[center_lat, center_lon],
-                zoom_start=12,
-                tiles='OpenStreetMap'
+    with col_controls[1]:
+        expand_map = st.checkbox("🔍 Expandir Mapa", help="Aumentar o tamanho do mapa para melhor visualização")
+    
+    with col_controls[2]:
+        if not route_data.empty:
+            st.metric("Total de Pontos", f"{len(route_data):,}")
+    
+    # Configuração do mapa responsivo
+    map_height = 800 if expand_map else 600
+    
+    if not route_data.empty and len(route_data) > 0:
+        # Preparar dados para pydeck
+        center_lat = route_data['latitude'].mean()
+        center_lon = route_data['longitude'].mean()
+        
+        # Preparar dados com cores baseadas na velocidade
+        map_data = route_data.copy()
+        map_data['color'] = map_data['velocidade_km'].apply(
+            lambda x: [255, 0, 0, 160] if x > speed_threshold else [0, 255, 0, 160]  # [R, G, B, A]
+        )
+        
+        # Tooltip para interatividade
+        tooltip_text = {
+            "html": "<b>Veículo:</b> {placa}<br/><b>Velocidade:</b> {velocidade_km:.1f} km/h<br/><b>Data:</b> {data}<br/><b>Coordenadas:</b> {latitude:.6f}, {longitude:.6f}",
+            "style": {"backgroundColor": "steelblue", "color": "white"}
+        }
+        
+        # Configurar visualização inicial
+        initial_view = pdk.ViewState(
+            latitude=center_lat,
+            longitude=center_lon,
+            zoom=12,
+            pitch=0,
+            bearing=0
+        )
+        
+        if view_mode == "Pontos Individuais":
+            # Camada de pontos (ScatterplotLayer) - Otimizada para performance
+            scatter_layer = pdk.Layer(
+                'ScatterplotLayer',
+                data=map_data,
+                get_position=['longitude', 'latitude'],
+                get_color='color',
+                get_radius=30,  # Radius em metros
+                radius_min_pixels=2,
+                radius_max_pixels=8,
+                pickable=True,
+                auto_highlight=True
             )
             
-            # Adicionar pontos coloridos por velocidade
-            for idx, row in route_data.iterrows():
-                if pd.notna(row['latitude']) and pd.notna(row['longitude']):
-                    color = 'red' if row.get('velocidade_km', 0) > speed_threshold else 'green'
-                    popup_text = f"""
-                    Veículo: {row.get('placa', 'N/A')}<br>
-                    Velocidade: {row.get('velocidade_km', 0):.1f} km/h<br>
-                    Data: {row.get('data', 'N/A')}<br>
-                    Coordenadas: {row['latitude']:.6f}, {row['longitude']:.6f}
-                    """
-                    
-                    folium.CircleMarker(
-                        location=[row['latitude'], row['longitude']],
-                        radius=3,
-                        popup=popup_text,
-                        color=color,
-                        fill=True,
-                        fillOpacity=0.7
-                    ).add_to(m)
+            layers = [scatter_layer]
             
-            # Exibir mapa
-            map_data = st_folium(m, width=700, height=400)
-        else:
-            st.warning("Não há dados de coordenadas suficientes para exibir o mapa.")
-    
-    with col2:
-        st.subheader("📊 Resumo da Rota")
+        else:  # Densidade (Hexágonos)
+            # Camada de hexágonos para datasets grandes (HexagonLayer)
+            hex_layer = pdk.Layer(
+                'HexagonLayer',
+                data=map_data,
+                get_position=['longitude', 'latitude'],
+                radius=200,  # Raio do hexágono em metros
+                elevation_scale=4,
+                elevation_range=[0, 100],
+                pickable=True,
+                extruded=True,
+                coverage=1
+            )
+            
+            layers = [hex_layer]
         
-        if not route_data.empty:
-            total_points = len(route_data)
-            speed_violations = len(route_data[route_data['velocidade_km'] > speed_threshold])
-            avg_speed = route_data['velocidade_km'].mean()
-            max_speed = route_data['velocidade_km'].max()
-            
+        # Criar deck
+        deck = pdk.Deck(
+            layers=layers,
+            initial_view_state=initial_view,
+            tooltip=tooltip_text if view_mode == "Pontos Individuais" else None,
+            map_provider='carto',  # Usar Carto (gratuito) ao invés de Mapbox
+            map_style='light'
+        )
+        
+        # Renderizar mapa
+        st.pydeck_chart(deck, height=map_height)
+        
+    else:
+        st.warning("⚠️ Não há dados de coordenadas suficientes para exibir o mapa.")
+    
+    # Resumo estatístico em colunas
+    if not route_data.empty:
+        st.subheader("📊 Estatísticas da Rota")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        total_points = len(route_data)
+        speed_violations = len(route_data[route_data['velocidade_km'] > speed_threshold])
+        avg_speed = route_data['velocidade_km'].mean()
+        max_speed = route_data['velocidade_km'].max()
+        
+        with col1:
             st.metric("Total de Pontos", f"{total_points:,}")
+        with col2:
             st.metric("Velocidade Média", f"{avg_speed:.1f} km/h")
+        with col3:
             st.metric("Velocidade Máxima", f"{max_speed:.1f} km/h")
+        with col4:
             st.metric("Picos de Velocidade", f"{speed_violations:,}", 
                      delta=f"{(speed_violations/total_points*100):.1f}% do total")
+        
+        # Informações sobre otimização
+        if total_points > 10000:
+            st.info(
+                f"💡 **Dica de Performance**: Com {total_points:,} pontos, use o modo 'Densidade (Hexágonos)' "
+                "para melhor performance e visualização de padrões."
+            )
+        
+        # Legenda de cores
+        st.markdown("""
+        **Legenda:**
+        - 🟢 **Verde**: Velocidade normal (≤ {} km/h)
+        - 🔴 **Vermelho**: Pico de velocidade (> {} km/h)
+        """.format(speed_threshold, speed_threshold))
 
 with tab2:
     st.header("📊 Análise de Velocidade")
@@ -206,7 +278,7 @@ with tab2:
             )
             fig_hist.add_vline(x=speed_threshold, line_dash="dash", line_color="red", 
                               annotation_text=f"Limite: {speed_threshold} km/h")
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, width='stretch')
         
         with col2:
             # Velocidade ao longo do tempo
@@ -220,7 +292,7 @@ with tab2:
                     labels={'data': 'Data/Hora', 'velocidade_km': 'Velocidade (km/h)'}
                 )
                 fig_time.add_hline(y=speed_threshold, line_dash="dash", line_color="red")
-                st.plotly_chart(fig_time, use_container_width=True)
+                st.plotly_chart(fig_time, width='stretch')
         
         # Tabela de picos de velocidade
         speed_violations_df = route_data[route_data['velocidade_km'] > speed_threshold]
@@ -228,7 +300,7 @@ with tab2:
             st.subheader("⚠️ Picos de Velocidade Detectados")
             speed_violations_display = speed_violations_df[['data', 'placa', 'velocidade_km', 'latitude', 'longitude']].copy()
             speed_violations_display = speed_violations_display.sort_values('velocidade_km', ascending=False)
-            st.dataframe(speed_violations_display.head(20), use_container_width=True)
+            st.dataframe(speed_violations_display.head(20), width='stretch')
 
 with tab3:
     st.header("🛣️ Análise de Rotas Frequentes")
@@ -259,7 +331,7 @@ with tab3:
                 title="Top 10 Locais Mais Visitados",
                 labels={'frequencia': 'Número de Visitas', 'y': 'Ranking'}
             )
-            st.plotly_chart(fig_freq, use_container_width=True)
+            st.plotly_chart(fig_freq, width='stretch')
         
         with col2:
             # Análise por horário
@@ -274,7 +346,7 @@ with tab3:
                     title="Atividade por Horário do Dia",
                     labels={'hora': 'Hora do Dia', 'atividade': 'Número de Registros'}
                 )
-                st.plotly_chart(fig_hourly, use_container_width=True)
+                st.plotly_chart(fig_hourly, width='stretch')
 
 with tab4:
     st.header("⚠️ Análise de Desvios de Rota")
@@ -328,7 +400,7 @@ with tab4:
                 )
                 fig_scatter.add_vline(x=deviation_radius, line_dash="dash", line_color="red",
                                     annotation_text=f"Limite: {deviation_radius} km")
-                st.plotly_chart(fig_scatter, use_container_width=True)
+                st.plotly_chart(fig_scatter, width='stretch')
 
 with tab5:
     st.header("📈 Padrões Temporais de Movimento")
@@ -355,7 +427,7 @@ with tab5:
                 title="Atividade por Dia da Semana",
                 labels={'dia_semana': 'Dia da Semana', 'atividade': 'Número de Registros'}
             )
-            st.plotly_chart(fig_daily, use_container_width=True)
+            st.plotly_chart(fig_daily, width='stretch')
         
         with col2:
             # Heatmap de atividade por hora e dia
@@ -371,7 +443,7 @@ with tab5:
                 title="Padrão de Atividade (Heatmap)",
                 aspect="auto"
             )
-            st.plotly_chart(fig_heatmap, use_container_width=True)
+            st.plotly_chart(fig_heatmap, width='stretch')
         
         # Análise de velocidade média por período
         st.subheader("🚗 Velocidade Média por Período")
@@ -392,11 +464,11 @@ with tab5:
             title="Velocidade Média por Período do Dia",
             labels={'periodo': 'Período', 'velocidade_media': 'Velocidade Média (km/h)'}
         )
-        st.plotly_chart(fig_period, use_container_width=True)
+        st.plotly_chart(fig_period, width='stretch')
         
         # Tabela resumo
         st.subheader("📊 Resumo Estatístico por Período")
-        st.dataframe(period_stats, use_container_width=True)
+        st.dataframe(period_stats, width='stretch')
 
 # Footer com informações técnicas
 st.markdown("---")
