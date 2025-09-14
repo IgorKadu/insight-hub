@@ -122,10 +122,10 @@ class FleetDatabaseService:
                             exit=record.get('saida', 0) == 1,
                             packet_id=record.get('pacote'),
                             odometer_period_km=record.get('odometro_periodo_km', 0.0),
-                            odometer_embedded_km=record.get('odometro_embarcado_km', 0.0),
-                            hourmeter_period=record.get('horimetro_periodo'),
-                            hourmeter_embedded=record.get('horimetro_embarcado'),
-                            battery_voltage=record.get('bateria'),
+                            odometer_total_km=record.get('odometro_embarcado_km', 0.0),
+                            engine_hours_period=record.get('horimetro_periodo'),
+                            engine_hours_total=record.get('horimetro_embarcado'),
+                            battery_level=record.get('bateria'),
                             voltage=record.get('tensao'),
                             image_url=record.get('imagem')
                         )

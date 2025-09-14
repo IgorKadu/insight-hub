@@ -115,7 +115,10 @@ def main():
             
             # Botão para processar todos os arquivos
             if st.button("🚀 Processar Todos os Arquivos", type="primary"):
-                process_multiple_csv_files(uploaded_files)
+                # Ordenar arquivos por tamanho (menor para maior) para processamento mais eficiente
+                sorted_files = sorted(uploaded_files, key=lambda f: f.size)
+                st.info(f"📊 Arquivos ordenados por tamanho: menor → maior para otimizar processamento")
+                process_multiple_csv_files(sorted_files)
                 
         except Exception as e:
             st.error(f"❌ Erro ao ler os arquivos: {str(e)}")
