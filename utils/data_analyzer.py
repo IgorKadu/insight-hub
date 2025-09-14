@@ -20,21 +20,14 @@ class DataAnalyzer:
     def from_database(cls, cliente=None, placa=None, data_inicio=None, data_fim=None):
         """Cria uma instância do analisador usando dados da base de dados"""
         try:
-            # Verificar se há dados na base de dados
+            # Verificar se há dados REAIS na base de dados
             if not DatabaseManager.has_data():
-                # Fall back para dados em arquivo se disponível
-                import os
-                if os.path.exists('data/processed_data.csv'):
-                    df = pd.read_csv('data/processed_data.csv')
-                    # Converter data se necessário
-                    if 'data' in df.columns:
-                        df['data'] = pd.to_datetime(df['data'], errors='coerce')
-                else:
-                    # Criar DataFrame vazio com estrutura esperada
-                    df = pd.DataFrame(columns=[
-                        'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
-                        'gps', 'bloqueado', 'horimetro_periodo_horas'
-                    ])
+                # Sem fallbacks fictícios - apenas DataFrame vazio
+                print("⚠️ Nenhum dado real encontrado na base de dados")
+                df = pd.DataFrame(columns=[
+                    'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
+                    'gps', 'bloqueado', 'horimetro_periodo_horas'
+                ])
             else:
                 # Buscar dados da base de dados com filtros
                 df = DatabaseManager.get_dashboard_data(

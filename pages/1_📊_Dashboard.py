@@ -20,24 +20,21 @@ st.set_page_config(
 )
 
 def load_data():
-    """Carrega dados processados da base de dados ou arquivo"""
+    """Carrega dados APENAS da base de dados (dados reais)"""
     try:
-        # Tentar carregar da base de dados primeiro
+        # Carregar APENAS da base de dados - sem fallbacks fictícios
         if DatabaseManager.has_data():
             df = DatabaseManager.get_dashboard_data()
             if not df.empty:
+                st.success(f"✅ Dados reais carregados: {len(df):,} registros da base de dados")
                 return df
         
-        # Fall back para arquivo se não há dados na base de dados
-        data_file = "data/processed_data.csv"
-        if os.path.exists(data_file):
-            df = pd.read_csv(data_file)
-            df['data'] = pd.to_datetime(df['data'])
-            return df
-            
+        # Se não há dados reais, mostrar mensagem clara
+        st.warning("⚠️ Nenhum dado real encontrado na base de dados. Faça upload dos seus arquivos CSV.")
         return pd.DataFrame()
+        
     except Exception as e:
-        st.error(f"Erro ao carregar dados: {str(e)}")
+        st.error(f"Erro ao carregar dados reais: {str(e)}")
         return pd.DataFrame()
 
 def main():
