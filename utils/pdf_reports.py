@@ -142,75 +142,112 @@ class PDFReportGenerator:
         except:
             return "N/A"
     
-    def generate_comprehensive_report(self, output_path: str = "relatorio_completo_frota.pdf") -> str:
-        """Gera relatório completo integrando dados de todos os painéis"""
+    def _add_safe_text(self, font: str, style: str, size: int, text: str, 
+                      align: str = 'L', height: int = 6, border: int = 0) -> None:
+        """Adiciona texto de forma segura ao PDF"""
+        self.pdf.set_font(font, style, size)
+        safe_text = self.safe_text(text)
+        self.pdf.cell(0, height, safe_text, border, 1, align)
+    
+    def _generate_error_pdf(self, error_message: str) -> Dict[str, Any]:
+        """Gera PDF de erro padronizado"""
         try:
-            # Carregar dados brutos
-            df = DatabaseManager.get_dashboard_data()
-            summary = DatabaseManager.get_fleet_summary()
+            error_buffer = BytesIO()
+            error_pdf = FPDF()
+            error_pdf.add_page()
+            error_pdf.set_font('Arial', 'B', 16)
+            error_pdf.cell(0, 10, 'ERRO NA GERACAO DO RELATORIO', 0, 1, 'C')
+            error_pdf.ln(10)
+            error_pdf.set_font('Arial', '', 12)
+            error_pdf.cell(0, 10, error_message[:100], 0, 1, 'C')
+            error_pdf.output(error_buffer)
             
-            if df.empty:
-                self.pdf.cell(0, 10, 'ERRO: Nenhum dado disponível para gerar relatório', 0, 1, 'C')
-                self.pdf.output(output_path)
-                return output_path
+            return {
+                'success': False,
+                'error': error_message,
+                'pdf_bytes': error_buffer.getvalue(),
+                'filename': 'relatorio_erro.pdf'
+            }
+        except:
+            return {
+                'success': False,
+                'error': error_message,
+                'pdf_bytes': b'',
+                'filename': 'relatorio_erro.pdf'
+            }
+    
+    def generate_comprehensive_report(self, filtered_df: pd.DataFrame, contexts: Dict[str, Any], 
+                                    options: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Gera relatório robusto usando dados filtrados e contextos pré-processados"""
+        try:
+            if options is None:
+                options = {}
             
-            # Inicializar analisadores para dados processados
-            analyzer = DataAnalyzer(df)
-            insights_generator = InsightsGenerator(analyzer)
-            predictive_analyzer = PredictiveMaintenanceAnalyzer()
+            include_charts = options.get('include_charts', False)
+            report_type = options.get('report_type', 'Relatorio Executivo Completo')
+            
+            if filtered_df.empty:
+                return self._generate_error_pdf('Nenhum dado disponivel para gerar relatorio')
+            
+            # Usar dados e contextos já processados (sem depender de imports externos)
+            kpis = contexts.get('kpis', {})
+            insights = contexts.get('insights', [])
+            predictive_results = contexts.get('predictive', {})
+            routes_context = contexts.get('routes', {})
+            operational_context = contexts.get('operational', {})
+            compliance_context = contexts.get('compliance', {})
+            
+            # Usar dados filtrados ao invés de recarregar
+            total_records = len(filtered_df)
+            total_vehicles = filtered_df['placa'].nunique() if 'placa' in filtered_df.columns else 0
+            total_clients = filtered_df['cliente'].nunique() if 'cliente' in filtered_df.columns else 0
             
             # Cabeçalho principal aprimorado
-            self.pdf.set_font('Arial', 'B', 20)
-            self.pdf.cell(0, 15, 'RELATÓRIO EXECUTIVO INTEGRADO DE FROTA', 0, 1, 'C')
-            self.pdf.set_font('Arial', 'I', 14)
-            self.pdf.cell(0, 8, 'Insight Hub - Análise Inteligente e Preditiva', 0, 1, 'C')
-            self.pdf.set_font('Arial', '', 10)
-            self.pdf.cell(0, 6, 'Relatório consolidado com dados de todos os painéis do sistema', 0, 1, 'C')
+            self._add_safe_text(self.default_font, 'B', 20, 'RELATORIO EXECUTIVO INTEGRADO DE FROTA', align='C', height=15)
+            self._add_safe_text(self.default_font, 'I', 14, 'Insight Hub - Analise Inteligente e Preditiva', align='C', height=8)
+            self._add_safe_text(self.default_font, '', 10, 'Relatorio consolidado com dados de todos os paineis do sistema', align='C', height=6)
             self.pdf.ln(10)
             
-            # Informações do relatório
-            self.pdf.set_font('Arial', '', 10)
-            self.pdf.cell(0, 6, f'Data de Geração: {datetime.now().strftime("%d/%m/%Y às %H:%M:%S")}', 0, 1)
-            self.pdf.cell(0, 6, f'Período Analisado: {df["data"].min().strftime("%d/%m/%Y")} a {df["data"].max().strftime("%d/%m/%Y")}', 0, 1)
-            self.pdf.cell(0, 6, f'Fonte: Dados integrados de 5 painéis analíticos', 0, 1)
+            # Informações do relatório com tratamento seguro de datas
+            generation_date = datetime.now().strftime("%d/%m/%Y as %H:%M:%S")
+            self._add_safe_text(self.default_font, '', 10, f'Data de Geracao: {generation_date}')
+            
+            # Tratamento seguro do período
+            period_start = self.safe_date_format(filtered_df['data'].min() if 'data' in filtered_df.columns else None)
+            period_end = self.safe_date_format(filtered_df['data'].max() if 'data' in filtered_df.columns else None)
+            self._add_safe_text(self.default_font, '', 10, f'Periodo Analisado: {period_start} a {period_end}')
+            
+            self._add_safe_text(self.default_font, '', 10, 'Fonte: Dados integrados de 5 paineis analiticos')
             self.pdf.ln(8)
             
-            # Gerar insights automáticos
-            insights = insights_generator.generate_all_insights()
-            kpis = analyzer.get_kpis()
-            
-            # Análise preditiva (se houver dados suficientes)
-            predictive_results = None
-            if len(df) > 50:  # Mínimo de dados para ML
-                try:
-                    predictive_results = predictive_analyzer.analyze_vehicle_health(df)
-                except Exception as e:
-                    print(f"Erro na análise preditiva: {e}")
-                    predictive_results = None
-            
             # 1. RESUMO EXECUTIVO COM INSIGHTS INTELIGENTES
-            self.add_header('1. RESUMO EXECUTIVO & INSIGHTS AUTOMÁTICOS')
+            self.add_header('1. RESUMO EXECUTIVO & INSIGHTS AUTOMATICOS')
             
             # Insights críticos no topo
-            critical_insights = [i for i in insights if i['type'] == 'error']
+            critical_insights = [i for i in insights if i.get('type') == 'error']
             if critical_insights:
-                self.add_subsection('🚨 ALERTAS CRÍTICOS IDENTIFICADOS:')
+                self.add_subsection('ALERTAS CRITICOS IDENTIFICADOS:')
                 for insight in critical_insights[:3]:  # Top 3 críticos
-                    self.pdf.set_font('Arial', '', 9)
-                    self.pdf.cell(0, 5, f"• {insight['title']}: {insight['description']}", 0, 1)
+                    title = self.safe_text(insight.get('title', ''))
+                    description = self.safe_text(insight.get('description', ''))
+                    text = f"* {title}: {description}"
+                    # Quebrar linhas longas
+                    if len(text) > 80:
+                        text = text[:77] + "..."
+                    self._add_safe_text(self.default_font, '', 9, text, height=5)
                 self.pdf.ln(3)
             
-            # Usar KPIs do analyzer ao invés de cálculos básicos
-            total_records = kpis['total_registros'] if kpis else len(df)
-            total_vehicles = kpis['total_veiculos'] if kpis else df['placa'].nunique()
-            total_clients = kpis['total_clientes'] if kpis else df['cliente'].nunique() 
-            avg_speed = kpis['velocidade_media'] if kpis else df['velocidade_km'].mean()
-            max_speed = kpis['velocidade_maxima'] if kpis else df['velocidade_km'].max()
-            total_distance = kpis['km_total'] if kpis else df['odometro_periodo_km'].sum()
-            gps_coverage = kpis['cobertura_gps'] if kpis else 0
+            # Usar KPIs do contexto com fallbacks seguros
+            avg_speed = kpis.get('velocidade_media', 0) if kpis else (
+                filtered_df['velocidade_km'].mean() if 'velocidade_km' in filtered_df.columns else 0)
+            max_speed = kpis.get('velocidade_maxima', 0) if kpis else (
+                filtered_df['velocidade_km'].max() if 'velocidade_km' in filtered_df.columns else 0)
+            total_distance = kpis.get('km_total', 0) if kpis else (
+                filtered_df['odometro_periodo_km'].sum() if 'odometro_periodo_km' in filtered_df.columns else 0)
+            gps_coverage = kpis.get('cobertura_gps', 0) if kpis else 0
             
             # Métricas principais aprimoradas
-            self.add_subsection('📊 MÉTRICAS PRINCIPAIS DA FROTA:')
+            self.add_subsection('METRICAS PRINCIPAIS DA FROTA:')
             self.add_metric('Total de Registros Processados', f'{total_records:,}')
             self.add_metric('Veículos Monitorados', f'{total_vehicles}')
             self.add_metric('Clientes Atendidos', f'{total_clients}')
@@ -233,12 +270,14 @@ class PDFReportGenerator:
             self.pdf.ln(5)
             
             # Recomendações prioritárias dos insights
-            recommendations_insights = [i for i in insights if i['type'] in ['warning', 'info']]
+            recommendations_insights = [i for i in insights if i.get('type') in ['warning', 'info']]
             if recommendations_insights:
-                self.add_subsection('💡 RECOMENDAÇÕES PRIORITÁRIAS:')
+                self.add_subsection('RECOMENDACOES PRIORITARIAS:')
                 for insight in recommendations_insights[:4]:  # Top 4 recomendações
-                    self.pdf.set_font('Arial', '', 9)
-                    self.pdf.cell(0, 5, f"• {insight.get('recommendation', 'Ver detalhes')}", 0, 1)
+                    recommendation = self.safe_text(insight.get('recommendation', 'Ver detalhes'))
+                    if len(recommendation) > 75:
+                        recommendation = recommendation[:72] + "..."
+                    self._add_safe_text(self.default_font, '', 9, f"* {recommendation}", height=5)
                 self.pdf.ln(3)
             
             # 2. ANÁLISE PREDITIVA DE MANUTENÇÃO
@@ -357,8 +396,8 @@ class PDFReportGenerator:
             # 6. ANÁLISE DE VELOCIDADE E CONFORMIDADE OPERACIONAL
             self.add_header('6. ANÁLISE DE VELOCIDADE E CONFORMIDADE OPERACIONAL')
             
-            # Usar análise de compliance do DataAnalyzer
-            compliance_data = analyzer.get_compliance_analysis() if kpis else None
+            # Usar dados de conformidade do contexto
+            compliance_data = compliance_context
             if compliance_data:
                 self.add_subsection('Análise de Conformidade Avançada:')
                 
@@ -378,22 +417,31 @@ class PDFReportGenerator:
                             status = 'Crítico' if score < 50 else 'Atenção'
                             self.add_table_row([vehicle, f'{score:.1f}%', status])
             
-            # Faixas de velocidade
-            speed_ranges = {
-                '0-30 km/h': len(df[df['velocidade_km'] <= 30]),
-                '31-60 km/h': len(df[(df['velocidade_km'] > 30) & (df['velocidade_km'] <= 60)]),
-                '61-80 km/h': len(df[(df['velocidade_km'] > 60) & (df['velocidade_km'] <= 80)]),
-                '81-100 km/h': len(df[(df['velocidade_km'] > 80) & (df['velocidade_km'] <= 100)]),
-                'Acima de 100 km/h': len(df[df['velocidade_km'] > 100])
-            }
+            # Distribuição de velocidades do contexto
+            speed_distribution = compliance_context.get('speed_distribution', {})
+            if speed_distribution:
+                speed_ranges = speed_distribution
+            else:
+                # Fallback se contexto não tiver distribuição
+                if 'velocidade_km' in filtered_df.columns:
+                    speed_ranges = {
+                        '0-30 km/h': len(filtered_df[filtered_df['velocidade_km'] <= 30]),
+                        '31-60 km/h': len(filtered_df[(filtered_df['velocidade_km'] > 30) & (filtered_df['velocidade_km'] <= 60)]),
+                        '61-80 km/h': len(filtered_df[(filtered_df['velocidade_km'] > 60) & (filtered_df['velocidade_km'] <= 80)]),
+                        '81-100 km/h': len(filtered_df[(filtered_df['velocidade_km'] > 80) & (filtered_df['velocidade_km'] <= 100)]),
+                        'Acima de 100 km/h': len(filtered_df[filtered_df['velocidade_km'] > 100])
+                    }
+                else:
+                    speed_ranges = {}
             
             self.add_subsection('Distribuição de Velocidades:')
             for faixa, count in speed_ranges.items():
                 percentage = (count / total_records * 100) if total_records > 0 else 0
                 self.add_metric(faixa, f'{count:,} ({percentage:.1f}%)')
             
-            # Violações de velocidade (acima de 80 km/h)
-            violations = df[df['velocidade_km'] > 80]
+            # Alertas de velocidade do contexto
+            total_violations = compliance_context.get('total_violations', 0)
+            violations = filtered_df[filtered_df['velocidade_km'] > 80] if 'velocidade_km' in filtered_df.columns and not filtered_df.empty else pd.DataFrame()
             self.add_subsection('Alertas de Velocidade (acima de 80 km/h):')
             self.add_metric('Total de Violações', f'{len(violations):,}')
             self.add_metric('Percentual da Frota', f'{(len(violations)/total_records*100):.1f}%')
@@ -506,11 +554,11 @@ class PDFReportGenerator:
                 self.pdf.set_font(self.default_font, '', 12)
                 self.pdf.cell(0, 8, f'Data: {datetime.now().strftime("%d/%m/%Y")}', 0, 1)
                 self.pdf.cell(0, 8, f'Total de registros: {len(df):,}', 0, 1)
-                self.pdf.cell(0, 8, f'Veiculos: {df["placa"].nunique() if "placa" in df.columns else 0}', 0, 1)
-                self.pdf.cell(0, 8, f'Clientes: {df["cliente"].nunique() if "cliente" in df.columns else 0}', 0, 1)
+                self._add_safe_text(self.default_font, '', 12, f'Veiculos: {df["placa"].nunique() if "placa" in df.columns else 0}', height=8)
+                self._add_safe_text(self.default_font, '', 12, f'Clientes: {df["cliente"].nunique() if "cliente" in df.columns else 0}', height=8)
                 
                 if 'velocidade_km' in df.columns:
-                    self.pdf.cell(0, 8, f'Velocidade media: {df["velocidade_km"].mean():.1f} km/h', 0, 1)
+                    self._add_safe_text(self.default_font, '', 12, f'Velocidade media: {df["velocidade_km"].mean():.1f} km/h', height=8)
                 
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 self.pdf.output(output_path)
