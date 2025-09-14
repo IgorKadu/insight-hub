@@ -195,13 +195,18 @@ class DataAnalyzer:
             return {}
         
         # Análise por veículo
-        vehicle_stats = df.groupby('placa').agg({
+        agg_dict = {
             'velocidade_km': ['mean', 'max', 'count'],
             'odometro_periodo_km': 'sum',
-            'engine_hours_period': 'sum' if 'engine_hours_period' in df.columns else lambda x: 0,
             'gps': 'mean',
             'bloqueado': 'any'
-        }).round(2)
+        }
+        
+        # Adicionar engine_hours_period apenas se existir na coluna
+        if 'engine_hours_period' in df.columns:
+            agg_dict['engine_hours_period'] = 'sum'
+        
+        vehicle_stats = df.groupby('placa').agg(agg_dict).round(2)
         
         # Achatamento do MultiIndex
         vehicle_stats.columns = ['_'.join(col) for col in vehicle_stats.columns]
