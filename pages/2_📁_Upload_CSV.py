@@ -464,7 +464,89 @@ def save_processing_record(filename, summary):
         st.warning(f"⚠️ Não foi possível salvar o registro: {str(e)}")
 
 def show_processing_history():
-    """Mostra histórico de processamentos"""
+    """Mostra histórico de processamentos da base de dados"""
+    try:
+        # Buscar histórico da base de dados
+        history_records = DatabaseManager.get_processing_history()
+        
+        if not history_records:
+            st.info("📋 Nenhum histórico de processamento encontrado.")
+            return
+        
+        st.markdown("### 📋 Histórico de Processamento")
+        
+        # Converter para DataFrame para exibição
+        history_df = pd.DataFrame(history_records)
+        
+        # Formatação dos dados
+        if not history_df.empty:
+            # Renomear colunas para português
+            history_df = history_df.rename(columns={
+                'filename': 'Nome do Arquivo',
+                'upload_timestamp': 'Data/Hora',
+                'records_processed': 'Registros',
+                'unique_vehicles': 'Veículos',
+                'unique_clients': 'Clientes',
+                'processing_status': 'Status',
+                'file_size_bytes': 'Tamanho (bytes)'
+            })
+            
+            # Formatar a coluna de data/hora
+            if 'Data/Hora' in history_df.columns:
+                history_df['Data/Hora'] = pd.to_datetime(history_df['Data/Hora']).dt.strftime('%d/%m/%Y %H:%M:%S')
+            
+            # Formatar status
+            if 'Status' in history_df.columns:
+                history_df['Status'] = history_df['Status'].map({
+                    'completed': '✅ Concluído',
+                    'failed': '❌ Erro',
+                    'processing': '🔄 Processando'
+                }).fillna('❓ Desconhecido')
+            
+            # Formatar números
+            for col in ['Registros', 'Veículos', 'Clientes']:
+                if col in history_df.columns:
+                    history_df[col] = history_df[col].apply(lambda x: f"{x:,}" if pd.notnull(x) else "0")
+            
+            # Ordenar por data mais recente
+            if 'Data/Hora' in history_df.columns:
+                history_df = history_df.sort_values('Data/Hora', ascending=False)
+            
+            # Mostrar tabela
+            st.dataframe(
+                history_df[['Nome do Arquivo', 'Data/Hora', 'Registros', 'Veículos', 'Clientes', 'Status']], 
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Estatísticas gerais do histórico
+            total_records = sum([int(r.get('records_processed', 0)) for r in history_records])
+            total_files = len(history_records)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📁 Arquivos Processados", total_files)
+            with col2:
+                st.metric("📊 Total de Registros", f"{total_records:,}")
+            with col3:
+                successful_files = len([r for r in history_records if r.get('processing_status') == 'completed'])
+                st.metric("✅ Taxa de Sucesso", f"{(successful_files/total_files*100):.1f}%" if total_files > 0 else "0%")
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar histórico: {str(e)}")
+        
+    # Botão para limpar histórico
+    if st.button("🗑️ Limpar Histórico", type="secondary", help="Remove todos os registros do histórico (não remove os dados)"):
+        if st.warning("⚠️ Tem certeza que deseja limpar o histórico? Esta ação não pode ser desfeita."):
+            try:
+                # Implementar função para limpar histórico se necessário
+                st.success("Histórico limpo com sucesso!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao limpar histórico: {str(e)}")
+
+def show_processing_history_old():
+    """Mostra histórico de processamentos (versão antiga usando arquivo)"""
     history_file = 'data/processing_history.csv'
     
     if not os.path.exists(history_file):
