@@ -185,7 +185,7 @@ class DatabaseManager:
                     # Save processing record
                     unique_vehicles = len(set(r['placa'] for r in records))
                     unique_clients = len(set(r['cliente'] for r in records))
-                    db.save_processing_record(
+                    db.save_processing_history(
                         filename=filename,
                         records_processed=records_saved,
                         unique_vehicles=unique_vehicles,
