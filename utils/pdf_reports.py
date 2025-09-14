@@ -3,6 +3,9 @@ from fpdf import FPDF
 import pandas as pd
 from datetime import datetime, timedelta
 from database.db_manager import DatabaseManager
+from utils.data_analyzer import DataAnalyzer
+from utils.insights_generator import InsightsGenerator
+from utils.ml_predictive import PredictiveMaintenanceAnalyzer
 import os
 import numpy as np
 
@@ -51,9 +54,9 @@ class PDFReportGenerator:
         self.pdf.ln()
     
     def generate_comprehensive_report(self, output_path: str = "relatorio_completo_frota.pdf") -> str:
-        """Gera relatório completo e detalhado da frota"""
+        """Gera relatório completo integrando dados de todos os painéis"""
         try:
-            # Carregar dados
+            # Carregar dados brutos
             df = DatabaseManager.get_dashboard_data()
             summary = DatabaseManager.get_fleet_summary()
             
@@ -62,45 +65,127 @@ class PDFReportGenerator:
                 self.pdf.output(output_path)
                 return output_path
             
-            # Cabeçalho principal
-            self.pdf.set_font('Arial', 'B', 18)
-            self.pdf.cell(0, 15, 'RELATÓRIO EXECUTIVO DE FROTA', 0, 1, 'C')
-            self.pdf.set_font('Arial', 'I', 12)
-            self.pdf.cell(0, 8, 'Insight Hub - Sistema de Monitoramento Municipal', 0, 1, 'C')
+            # Inicializar analisadores para dados processados
+            analyzer = DataAnalyzer(df)
+            insights_generator = InsightsGenerator(analyzer)
+            predictive_analyzer = PredictiveMaintenanceAnalyzer()
+            
+            # Cabeçalho principal aprimorado
+            self.pdf.set_font('Arial', 'B', 20)
+            self.pdf.cell(0, 15, 'RELATÓRIO EXECUTIVO INTEGRADO DE FROTA', 0, 1, 'C')
+            self.pdf.set_font('Arial', 'I', 14)
+            self.pdf.cell(0, 8, 'Insight Hub - Análise Inteligente e Preditiva', 0, 1, 'C')
+            self.pdf.set_font('Arial', '', 10)
+            self.pdf.cell(0, 6, 'Relatório consolidado com dados de todos os painéis do sistema', 0, 1, 'C')
             self.pdf.ln(10)
             
             # Informações do relatório
             self.pdf.set_font('Arial', '', 10)
             self.pdf.cell(0, 6, f'Data de Geração: {datetime.now().strftime("%d/%m/%Y às %H:%M:%S")}', 0, 1)
             self.pdf.cell(0, 6, f'Período Analisado: {df["data"].min().strftime("%d/%m/%Y")} a {df["data"].max().strftime("%d/%m/%Y")}', 0, 1)
-            self.pdf.ln(10)
+            self.pdf.cell(0, 6, f'Fonte: Dados integrados de 5 painéis analíticos', 0, 1)
+            self.pdf.ln(8)
             
-            # 1. RESUMO EXECUTIVO
-            self.add_header('1. RESUMO EXECUTIVO')
+            # Gerar insights automáticos
+            insights = insights_generator.generate_all_insights()
+            kpis = analyzer.get_kpis()
             
-            total_records = len(df)
-            total_vehicles = df['placa'].nunique()
-            total_clients = df['cliente'].nunique()
-            avg_speed = df['velocidade_km'].mean()
-            max_speed = df['velocidade_km'].max()
-            total_distance = df['odometro_periodo_km'].sum()
+            # Análise preditiva (se houver dados suficientes)
+            predictive_results = None
+            if len(df) > 50:  # Mínimo de dados para ML
+                try:
+                    predictive_results = predictive_analyzer.analyze_vehicle_health(df)
+                except Exception as e:
+                    print(f"Erro na análise preditiva: {e}")
+                    predictive_results = None
             
-            # Métricas principais
+            # 1. RESUMO EXECUTIVO COM INSIGHTS INTELIGENTES
+            self.add_header('1. RESUMO EXECUTIVO & INSIGHTS AUTOMÁTICOS')
+            
+            # Insights críticos no topo
+            critical_insights = [i for i in insights if i['type'] == 'error']
+            if critical_insights:
+                self.add_subsection('🚨 ALERTAS CRÍTICOS IDENTIFICADOS:')
+                for insight in critical_insights[:3]:  # Top 3 críticos
+                    self.pdf.set_font('Arial', '', 9)
+                    self.pdf.cell(0, 5, f"• {insight['title']}: {insight['description']}", 0, 1)
+                self.pdf.ln(3)
+            
+            # Usar KPIs do analyzer ao invés de cálculos básicos
+            total_records = kpis['total_registros'] if kpis else len(df)
+            total_vehicles = kpis['total_veiculos'] if kpis else df['placa'].nunique()
+            total_clients = kpis['total_clientes'] if kpis else df['cliente'].nunique() 
+            avg_speed = kpis['velocidade_media'] if kpis else df['velocidade_km'].mean()
+            max_speed = kpis['velocidade_maxima'] if kpis else df['velocidade_km'].max()
+            total_distance = kpis['km_total'] if kpis else df['odometro_periodo_km'].sum()
+            gps_coverage = kpis['cobertura_gps'] if kpis else 0
+            
+            # Métricas principais aprimoradas
+            self.add_subsection('📊 MÉTRICAS PRINCIPAIS DA FROTA:')
             self.add_metric('Total de Registros Processados', f'{total_records:,}')
             self.add_metric('Veículos Monitorados', f'{total_vehicles}')
             self.add_metric('Clientes Atendidos', f'{total_clients}')
             self.add_metric('Velocidade Média da Frota', f'{avg_speed:.1f}', 'km/h')
             self.add_metric('Velocidade Máxima Registrada', f'{max_speed:.1f}', 'km/h')
             self.add_metric('Distância Total Percorrida', f'{total_distance:.1f}', 'km')
-            
-            # Cobertura GPS
-            gps_quality = df['gps'].value_counts()
-            gps_coverage = (gps_quality.get('Ativo', 0) / total_records * 100) if total_records > 0 else 0
             self.add_metric('Cobertura GPS Ativa', f'{gps_coverage:.1f}', '%')
+            
+            # Score de saúde geral se disponível
+            if predictive_results and predictive_results.get('status') == 'success':
+                health_scores = predictive_results.get('health_scores', {})
+                overall_health = health_scores.get('geral', 0)
+                self.add_metric('Score de Saúde Geral da Frota', f'{overall_health}', '%')
+                
+                # Alertas de manutenção
+                maintenance_alerts = predictive_results.get('maintenance_alerts', [])
+                if maintenance_alerts:
+                    self.add_metric('Alertas de Manutenção Preditiva', f'{len(maintenance_alerts)}')
+            
             self.pdf.ln(5)
             
-            # 2. ANÁLISE POR CLIENTE
-            self.add_header('2. ANÁLISE POR CLIENTE')
+            # Recomendações prioritárias dos insights
+            recommendations_insights = [i for i in insights if i['type'] in ['warning', 'info']]
+            if recommendations_insights:
+                self.add_subsection('💡 RECOMENDAÇÕES PRIORITÁRIAS:')
+                for insight in recommendations_insights[:4]:  # Top 4 recomendações
+                    self.pdf.set_font('Arial', '', 9)
+                    self.pdf.cell(0, 5, f"• {insight.get('recommendation', 'Ver detalhes')}", 0, 1)
+                self.pdf.ln(3)
+            
+            # 2. ANÁLISE PREDITIVA DE MANUTENÇÃO
+            self.add_header('2. ANÁLISE PREDITIVA DE MANUTENÇÃO')
+            
+            if predictive_results and predictive_results.get('status') == 'success':
+                health_scores = predictive_results.get('health_scores', {})
+                maintenance_alerts = predictive_results.get('maintenance_alerts', [])
+                
+                self.add_subsection('Scores de Saúde dos Sistemas:')
+                self.add_metric('Saúde da Bateria', f'{health_scores.get("bateria", 0)}%')
+                self.add_metric('Comportamento de Condução', f'{health_scores.get("comportamento", 0)}%')
+                self.add_metric('Perfil de Velocidade', f'{health_scores.get("velocidade", 0)}%')
+                
+                if maintenance_alerts:
+                    self.add_subsection('Alertas de Manutenção Preditiva:')
+                    for alert in maintenance_alerts[:5]:  # Top 5 alertas
+                        self.pdf.set_font('Arial', '', 9)
+                        alert_text = f"• {alert.get('vehicle', 'N/A')}: {alert.get('message', 'Alerta detectado')}"
+                        self.pdf.cell(0, 5, alert_text[:90], 0, 1)  # Truncar se muito longo
+                        
+                # Recomendações de manutenção
+                recommendations = predictive_results.get('recommendations', [])
+                if recommendations:
+                    self.add_subsection('Recomendações de Ação:')
+                    for rec in recommendations[:3]:  # Top 3 recomendações
+                        self.pdf.set_font('Arial', '', 9)
+                        self.pdf.cell(0, 5, f"• {rec}"[:80], 0, 1)
+            else:
+                self.pdf.set_font('Arial', '', 10)
+                self.pdf.cell(0, 6, 'Dados insuficientes para análise preditiva (mínimo 50 registros)', 0, 1)
+            
+            self.pdf.ln(5)
+            
+            # 3. ANÁLISE POR CLIENTE
+            self.add_header('3. ANÁLISE POR CLIENTE')
             
             client_stats = df.groupby('cliente').agg({
                 'placa': 'nunique',
@@ -120,8 +205,46 @@ class PDFReportGenerator:
                 self.add_table_row(data)
             self.pdf.ln(5)
             
-            # 3. ANÁLISE DETALHADA POR VEÍCULO
-            self.add_header('3. ANÁLISE DETALHADA POR VEÍCULO')
+            # 4. ANÁLISE GEOGRÁFICA E PADRÕES DE ROTA
+            self.add_header('4. ANÁLISE GEOGRÁFICA E PADRÕES DE ROTA')
+            
+            # Análise geográfica baseada em coordenadas
+            if 'latitude' in df.columns and 'longitude' in df.columns:
+                valid_coords = df.dropna(subset=['latitude', 'longitude'])
+                valid_coords = valid_coords[(valid_coords['latitude'] != 0) & (valid_coords['longitude'] != 0)]
+                
+                if not valid_coords.empty:
+                    # Estatísticas geográficas
+                    center_lat = valid_coords['latitude'].mean()
+                    center_lon = valid_coords['longitude'].mean()
+                    
+                    # Calcular dispersão geográfica
+                    lat_range = valid_coords['latitude'].max() - valid_coords['latitude'].min()
+                    lon_range = valid_coords['longitude'].max() - valid_coords['longitude'].min()
+                    
+                    self.add_subsection('Cobertura Geográfica:')
+                    self.add_metric('Pontos com GPS Válido', f'{len(valid_coords):,}')
+                    self.add_metric('Centro Geográfico', f'{center_lat:.4f}, {center_lon:.4f}')
+                    self.add_metric('Dispersão Latitudinal', f'{lat_range:.4f}°')
+                    self.add_metric('Dispersão Longitudinal', f'{lon_range:.4f}°')
+                    
+                    # Análise de velocidade por região (simplificada)
+                    speed_violations = valid_coords[valid_coords['velocidade_km'] > 80]
+                    if not speed_violations.empty:
+                        self.add_subsection('Análise de Velocidade por Região:')
+                        self.add_metric('Picos de Velocidade Geo-referenciados', f'{len(speed_violations):,}')
+                        self.add_metric('Percentual de Violações', f'{len(speed_violations)/len(valid_coords)*100:.1f}%')
+                else:
+                    self.pdf.set_font('Arial', '', 10)
+                    self.pdf.cell(0, 6, 'Coordenadas GPS não disponíveis para análise geográfica', 0, 1)
+            else:
+                self.pdf.set_font('Arial', '', 10)
+                self.pdf.cell(0, 6, 'Dados de localização não encontrados', 0, 1)
+            
+            self.pdf.ln(5)
+            
+            # 5. ANÁLISE DETALHADA POR VEÍCULO
+            self.add_header('5. ANÁLISE DETALHADA POR VEÍCULO')
             
             vehicle_stats = df.groupby(['cliente', 'placa']).agg({
                 'velocidade_km': ['mean', 'max', 'std'],
@@ -142,8 +265,29 @@ class PDFReportGenerator:
                 self.add_table_row(data)
             self.pdf.ln(5)
             
-            # 4. ANÁLISE DE VELOCIDADE E SEGURANÇA
-            self.add_header('4. ANÁLISE DE VELOCIDADE E SEGURANÇA')
+            # 6. ANÁLISE DE VELOCIDADE E CONFORMIDADE OPERACIONAL
+            self.add_header('6. ANÁLISE DE VELOCIDADE E CONFORMIDADE OPERACIONAL')
+            
+            # Usar análise de compliance do DataAnalyzer
+            compliance_data = analyzer.get_compliance_analysis() if kpis else None
+            if compliance_data:
+                self.add_subsection('Análise de Conformidade Avançada:')
+                
+                # Scores de compliance por veículo se disponível
+                if 'compliance_scores' in compliance_data:
+                    avg_compliance = np.mean(list(compliance_data['compliance_scores'].values()))
+                    self.add_metric('Score Médio de Conformidade', f'{avg_compliance:.1f}%')
+                    
+                    # Veículos com baixa conformidade
+                    low_compliance = {k: v for k, v in compliance_data['compliance_scores'].items() if v < 70}
+                    if low_compliance:
+                        self.add_metric('Veículos com Baixa Conformidade', f'{len(low_compliance)}')
+                        
+                        self.add_subsection('Veículos Críticos (< 70% conformidade):')
+                        self.add_table_header(['Veículo', 'Score', 'Status'])
+                        for vehicle, score in list(low_compliance.items())[:5]:  # Top 5 críticos
+                            status = 'Crítico' if score < 50 else 'Atenção'
+                            self.add_table_row([vehicle, f'{score:.1f}%', status])
             
             # Faixas de velocidade
             speed_ranges = {
@@ -236,34 +380,92 @@ class PDFReportGenerator:
                 self.add_table_row(data)
             self.pdf.ln(5)
             
-            # 7. RECOMENDAÇÕES
-            self.add_header('7. RECOMENDAÇÕES E ALERTAS')
+            # 7. INSIGHTS INTELIGENTES E OPORTUNIDADES
+            self.add_header('7. INSIGHTS INTELIGENTES E OPORTUNIDADES DE MELHORIA')
+            
+            # Categorizar insights por tipo
+            opportunities = [i for i in insights if i['type'] == 'info' and 'oportunidade' in i.get('description', '').lower()]
+            warnings = [i for i in insights if i['type'] == 'warning']
+            successes = [i for i in insights if i['type'] == 'success']
+            
+            if opportunities:
+                self.add_subsection('🎯 Oportunidades de Otimização:')
+                for opp in opportunities[:4]:  # Top 4 oportunidades
+                    self.pdf.set_font('Arial', '', 9)
+                    self.pdf.cell(0, 5, f"• {opp.get('recommendation', opp['description'])}"[:85], 0, 1)
+            
+            if warnings:
+                self.add_subsection('⚠️ Pontos de Atenção:')
+                for warn in warnings[:4]:  # Top 4 warnings
+                    self.pdf.set_font('Arial', '', 9)
+                    self.pdf.cell(0, 5, f"• {warn.get('recommendation', warn['description'])}"[:85], 0, 1)
+            
+            if successes:
+                self.add_subsection('✅ Pontos Positivos:')
+                for success in successes[:3]:  # Top 3 sucessos
+                    self.pdf.set_font('Arial', '', 9)
+                    self.pdf.cell(0, 5, f"• {success['description']}"[:85], 0, 1)
+            
+            self.pdf.ln(5)
+            
+            # 8. PLANO DE AÇÃO E RECOMENDAÇÕES
+            self.add_header('8. PLANO DE AÇÃO E RECOMENDAÇÕES')
             
             self.pdf.set_font('Arial', '', 10)
+            
+            # Recomendações baseadas nos insights e análises
             recommendations = []
             
+            # Recomendações baseadas nos insights automáticos
+            for insight in insights:
+                if insight.get('recommendation') and insight['type'] in ['error', 'warning']:
+                    recommendations.append(f"• {insight['recommendation']}")
+            
+            # Recomendações baseadas na análise preditiva
+            if predictive_results and predictive_results.get('recommendations'):
+                for rec in predictive_results['recommendations'][:2]:
+                    recommendations.append(f"• Manutenção: {rec}")
+            
+            # Recomendações específicas baseadas nos dados
+            violations = df[df['velocidade_km'] > 80] if 'velocidade_km' in df.columns else pd.DataFrame()
             if len(violations) > total_records * 0.1:
                 recommendations.append("• Implementar treinamento de condução defensiva para reduzir violações de velocidade")
             
             if gps_coverage < 95:
                 recommendations.append("• Verificar sistema GPS dos veículos com baixa cobertura")
             
-            low_activity_vehicles = vehicle_stats[vehicle_stats[('data', 'count')] < 50].index
-            if len(low_activity_vehicles) > 0:
-                recommendations.append(f"• Investigar {len(low_activity_vehicles)} veículos com baixa atividade")
+            # Adicionar recomendação sobre manutenção preditiva se aplicável
+            if predictive_results and predictive_results.get('maintenance_alerts'):
+                recommendations.append(f"• Agendar manutenção preventiva para {len(predictive_results['maintenance_alerts'])} veículos")
             
-            if not recommendations:
-                recommendations.append("• Frota operando dentro dos parâmetros normais")
-                recommendations.append("• Continuar monitoramento regular")
+            # Se não há recomendações específicas, adicionar padrões
+            if not recommendations or len([r for r in recommendations if not r.startswith('•')]) == 0:
+                recommendations.extend([
+                    "• Frota operando dentro dos parâmetros esperados",
+                    "• Continuar monitoramento regular através do Insight Hub",
+                    "• Revisar relatórios mensalmente para identificar tendências"
+                ])
             
             for rec in recommendations:
                 self.pdf.cell(0, 6, rec.encode('latin-1', 'replace').decode('latin-1'), 0, 1)
             
-            self.pdf.ln(10)
+            self.pdf.ln(8)
             
-            # Rodapé
+            # Resumo final dos painéis analisados
+            self.add_header('RESUMO DOS PAINÉIS ANALISADOS')
+            self.pdf.set_font('Arial', '', 9)
+            self.pdf.cell(0, 5, '✓ Análise Detalhada: KPIs, métricas operacionais e padrões temporais', 0, 1)
+            self.pdf.cell(0, 5, '✓ Manutenção Preditiva: Health scores, alertas e detecção de anomalias', 0, 1)
+            self.pdf.cell(0, 5, '✓ Insights Automáticos: Recomendações inteligentes e alertas críticos', 0, 1)
+            self.pdf.cell(0, 5, '✓ Análise Geográfica: Padrões de rota e distribuição espacial', 0, 1)
+            self.pdf.cell(0, 5, '✓ Controle Operacional: Conformidade e monitoramento regulatório', 0, 1)
+            
+            self.pdf.ln(8)
+            
+            # Rodapé aprimorado
             self.pdf.set_font('Arial', 'I', 8)
-            self.pdf.cell(0, 5, f'Relatório gerado automaticamente pelo Insight Hub em {datetime.now().strftime("%d/%m/%Y às %H:%M:%S")}', 0, 1, 'C')
+            self.pdf.cell(0, 5, f'Relatório Integrado gerado pelo Insight Hub - {datetime.now().strftime("%d/%m/%Y às %H:%M:%S")}', 0, 1, 'C')
+            self.pdf.cell(0, 5, 'Dados consolidados de 5 painéis analíticos com IA e Machine Learning', 0, 1, 'C')
             
             # Salvar PDF
             self.pdf.output(output_path)

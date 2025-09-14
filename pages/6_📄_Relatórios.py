@@ -10,8 +10,46 @@ from utils.data_analyzer import DataAnalyzer
 import os
 
 st.set_page_config(page_title="Relatórios", page_icon="📄", layout="wide")
-st.title("📄 Relatórios Avançados")
-st.markdown("*Sistema completo de geração de relatórios com dados consolidados de todos os painéis*")
+st.title("📄 Relatórios Integrados Avançados")
+st.markdown("**🚀 Sistema de relatórios aprimorado que integra dados de TODOS os painéis analíticos**")
+st.markdown("---")
+
+# Destacar a integração dos painéis
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown("### 📊 **Painéis Integrados:**")
+with col2:
+    st.markdown("### 🤖 **Tecnologias:**")
+with col3:
+    st.markdown("### 📋 **Tipos de Análise:**")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown("""
+    - 🔍 **Análise Detalhada**  
+    - 🔮 **Manutenção Preditiva**  
+    - 🧠 **Insights Automáticos**  
+    - 🗺️ **Mapa de Rotas**  
+    - 🚨 **Controle Operacional**
+    """)
+with col2:
+    st.markdown("""
+    - 🤖 **Machine Learning**  
+    - 📊 **Análise Preditiva**  
+    - 🎯 **IA para Insights**  
+    - 🗺️ **Geoanálise**  
+    - 📈 **Analytics Avançado**
+    """)
+with col3:
+    st.markdown("""
+    - ⚡ **KPIs e Métricas**  
+    - 🔧 **Health Scores**  
+    - 💡 **Recomendações IA**  
+    - 🌍 **Padrões Geográficos**  
+    - ✅ **Conformidade**
+    """)
+
+st.markdown("---")
 
 # Carregar dados diretamente da base de dados
 df_inicial = DatabaseManager.get_dashboard_data()
@@ -178,8 +216,9 @@ def show_report_preview(df, summary, analyzer, tipo_relatorio):
         show_custom_preview(df, analyzer)
 
 def show_executive_preview(df, summary, analyzer):
-    """Preview do relatório executivo"""
-    st.markdown("### 📋 Resumo Executivo")
+    """Preview do relatório executivo integrado"""
+    st.markdown("### 📋 Resumo Executivo Integrado")
+    st.markdown("🚀 **Novo:** Dados consolidados de 5 painéis analíticos com IA e Machine Learning")
     
     # Verificar se há dados
     if df.empty:
