@@ -466,8 +466,27 @@ def save_processing_record(filename, summary):
 def show_processing_history():
     """Mostra histórico de processamentos da base de dados"""
     try:
-        # Buscar histórico da base de dados
-        history_records = DatabaseManager.get_processing_history()
+        # Tentar buscar histórico da base de dados com retry
+        history_records = None
+        retry_count = 0
+        max_retries = 3
+        
+        while retry_count < max_retries:
+            try:
+                history_records = DatabaseManager.get_processing_history()
+                break  # Success - exit retry loop
+            except Exception as retry_e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    # Se todas as tentativas falharam, mostrar mensagem amigável
+                    st.warning("⚠️ Problema temporário de conexão com a base de dados. O histórico não pode ser carregado no momento.")
+                    if st.button("🔄 Tentar Novamente"):
+                        st.rerun()
+                    return
+                else:
+                    # Aguardar um pouco antes da próxima tentativa
+                    import time
+                    time.sleep(0.5)
         
         if not history_records:
             st.info("📋 Nenhum histórico de processamento encontrado.")
@@ -666,7 +685,19 @@ def show_processing_history_old():
                         st.error("❌ Erro ao limpar dados da base PostgreSQL")
         
     except Exception as e:
-        st.error(f"❌ Erro ao carregar histórico: {str(e)}")
+        error_message = str(e)
+        if "SSL connection has been closed unexpectedly" in error_message:
+            st.warning("⚠️ Problema temporário de conexão SSL com a base de dados. Tente recarregar a página.")
+            if st.button("🔄 Recarregar Página"):
+                st.rerun()
+        elif "psycopg2.OperationalError" in error_message:
+            st.warning("⚠️ Problema de conexão com a base de dados PostgreSQL. Verifique se o sistema está funcionando corretamente.")
+            if st.button("🔄 Tentar Novamente"):
+                st.rerun()
+        else:
+            st.error(f"❌ Erro ao carregar histórico: {error_message}")
+            if st.button("🔄 Tentar Novamente"):
+                st.rerun()
 
 if __name__ == "__main__":
     main()
