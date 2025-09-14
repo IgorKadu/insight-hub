@@ -20,17 +20,25 @@ st.set_page_config(
 )
 
 def load_data():
-    """Carrega dados processados"""
-    data_file = "data/processed_data.csv"
-    if os.path.exists(data_file):
-        try:
-            df = pd.read_csv(data_file)
-            df['data'] = pd.to_datetime(df['data'])
-            return df
-        except Exception as e:
-            st.error(f"Erro ao carregar dados: {str(e)}")
-            return pd.DataFrame()
-    return pd.DataFrame()
+    """Carrega dados APENAS da base de dados (dados reais)"""
+    try:
+        # Importar DatabaseManager
+        from database.db_manager import DatabaseManager
+        
+        # Carregar APENAS da base de dados - sem fallbacks fictícios
+        if DatabaseManager.has_data():
+            df = DatabaseManager.get_dashboard_data()
+            if not df.empty:
+                st.success(f"✅ Dados reais carregados: {len(df):,} registros da base de dados")
+                return df
+        
+        # Se não há dados reais, mostrar mensagem clara
+        st.warning("⚠️ Nenhum dado real encontrado na base de dados. Faça upload dos seus arquivos CSV.")
+        return pd.DataFrame()
+        
+    except Exception as e:
+        st.error(f"Erro ao carregar dados reais: {str(e)}")
+        return pd.DataFrame()
 
 def main():
     st.title("🔍 Análise Detalhada da Frota")
@@ -43,8 +51,8 @@ def main():
         st.warning("📁 Nenhum dado encontrado. Faça o upload de um arquivo CSV primeiro.")
         st.stop()
     
-    # Inicializar analisador
-    analyzer = DataAnalyzer(df)
+    # Inicializar analisador com dados da base de dados
+    analyzer = DataAnalyzer.from_database()
     visualizer = FleetVisualizations(analyzer)
     
     # Sidebar com filtros avançados
