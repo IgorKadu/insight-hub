@@ -1,2 +1,3 @@
 timestamp,filename,total_registros,total_veiculos,total_clientes,periodo_inicio,periodo_fim,velocidade_media,total_km
 2025-09-14T01:55:55.397714,sample_fleet_data.csv,20,5,2,2024-01-15 08:30:00,2024-01-15 13:15:00,45.445,260.6
+2025-09-14T02:19:25.402123,sample_fleet_data.csv,20,5,2,2024-01-15 08:30:00,2024-01-15 13:15:00,45.445,260.6
