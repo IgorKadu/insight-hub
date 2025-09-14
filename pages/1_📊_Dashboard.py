@@ -38,7 +38,7 @@ def load_data():
         return pd.DataFrame()
 
 def main():
-    st.title("📊 Dashboard de Monitoramento")
+    st.title("📊 Análise Profissional")
     st.markdown("---")
     
     # Carregar dados

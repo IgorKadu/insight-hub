@@ -94,6 +94,15 @@ if periodo_opcoes[periodo_selecionado] is not None:
     
     # Filtrar apenas se a coluna de data está disponível e foi convertida com sucesso
     if 'data' in df_filtered.columns and not df_filtered.empty:
+        # Verificar se a coluna de data tem timezone e ajustar a comparação
+        if hasattr(df_filtered['data'].dtype, 'tz') and df_filtered['data'].dtype.tz is not None:
+            # Se dados têm timezone, converter cutoff_date para timezone-aware
+            from datetime import timezone
+            cutoff_date = cutoff_date.replace(tzinfo=timezone.utc)
+        else:
+            # Se dados são naive, garantir que cutoff_date também seja naive
+            cutoff_date = cutoff_date.replace(tzinfo=None)
+        
         df_filtered = df_filtered[df_filtered['data'] >= cutoff_date]
         st.info(f"📅 Dados filtrados: {len(df_filtered):,} registros dos últimos {dias} dias")
     else:
