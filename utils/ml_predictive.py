@@ -62,7 +62,7 @@ class PredictiveMaintenanceAnalyzer:
             features_data = []
             
             # Converter campos numéricos primeiro
-            numeric_columns = ['velocidade_km', 'bateria', 'tensao', 'odometro_periodo_km', 'horimetro_periodo']
+            numeric_columns = ['velocidade_km', 'battery_level', 'tensao', 'odometro_periodo_km', 'engine_hours_period']
             for col in numeric_columns:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -70,17 +70,17 @@ class PredictiveMaintenanceAnalyzer:
             # Agrupar por hora para análise temporal
             df_hourly = df.groupby(df['data'].dt.floor('H')).agg({
                 'velocidade_km': ['mean', 'max', 'std'],
-                'bateria': 'mean',
+                'battery_level': 'mean',
                 'tensao': 'mean',
                 'odometro_periodo_km': 'sum',
-                'horimetro_periodo': 'sum',
+                'engine_hours_period': 'sum',
                 'ignicao': lambda x: (x == 'Ligada').sum() / len(x) if len(x) > 0 else 0
             }).reset_index()
             
             # Flatten column names
             df_hourly.columns = ['timestamp', 'vel_media', 'vel_max', 'vel_std', 
                                 'bateria_media', 'tensao_media', 'km_periodo', 
-                                'horimetro_periodo', 'ignicao_ratio']
+                                'engine_hours_periodo', 'ignicao_ratio']
             
             # Adicionar features temporais
             df_hourly['hora'] = df_hourly['timestamp'].dt.hour
@@ -88,7 +88,7 @@ class PredictiveMaintenanceAnalyzer:
             
             # Preencher NaNs
             numeric_cols = ['vel_media', 'vel_max', 'vel_std', 'bateria_media', 
-                           'tensao_media', 'km_periodo', 'horimetro_periodo', 'ignicao_ratio']
+                           'tensao_media', 'km_periodo', 'engine_hours_periodo', 'ignicao_ratio']
             for col in numeric_cols:
                 if col in df_hourly.columns:
                     df_hourly[col] = pd.to_numeric(df_hourly[col], errors='coerce').fillna(0)

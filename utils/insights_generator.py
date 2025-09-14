@@ -221,7 +221,7 @@ class InsightsGenerator:
         # Predição de manutenção baseada em uso
         vehicle_usage = df.groupby('placa').agg({
             'odometro_periodo_km': 'sum',
-            'horimetro_periodo': 'sum' if 'horimetro_periodo' in df.columns else lambda x: 0
+            'engine_hours_period': 'sum' if 'engine_hours_period' in df.columns else lambda x: 0
         })
         
         for placa, data in vehicle_usage.iterrows():
