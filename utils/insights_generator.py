@@ -198,10 +198,16 @@ class InsightsGenerator:
         if df.empty:
             return
         
-        # Análise de tendências
+        # Análise de tendências - usar período dinâmico baseado nos dados filtrados
         if len(df) > 7:  # Pelo menos uma semana de dados
-            recent_data = df[df['data'] >= df['data'].max() - timedelta(days=7)]
-            older_data = df[df['data'] < df['data'].max() - timedelta(days=7)]
+            # Calcular período de análise baseado no range total dos dados filtrados
+            date_range = (df['data'].max() - df['data'].min()).days
+            
+            # Usar 25% do período total para análise recente, mínimo 1 dia, máximo 7 dias
+            analysis_days = max(1, min(7, date_range // 4))
+            
+            recent_data = df[df['data'] >= df['data'].max() - timedelta(days=analysis_days)]
+            older_data = df[df['data'] < df['data'].max() - timedelta(days=analysis_days)]
             
             if not recent_data.empty and not older_data.empty:
                 recent_avg_speed = recent_data['velocidade_km'].mean()
@@ -211,9 +217,10 @@ class InsightsGenerator:
                 
                 if abs(speed_change) > 10:
                     trend = "aumento" if speed_change > 0 else "redução"
+                    period_text = f"últimos {analysis_days} dia{'s' if analysis_days > 1 else ''}"
                     self.add_insight(
                         f"📈 Tendência de Velocidade",
-                        f"Detectado {trend} de {abs(speed_change):.1f}% na velocidade média nos últimos 7 dias.",
+                        f"Detectado {trend} de {abs(speed_change):.1f}% na velocidade média nos {period_text}.",
                         f"Monitore esta tendência para identificar padrões sazonais ou operacionais.",
                         "info"
                     )
