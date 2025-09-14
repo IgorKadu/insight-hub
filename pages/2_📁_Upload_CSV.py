@@ -645,14 +645,25 @@ def show_processing_history_old():
                     st.rerun()
         
         with col_btn2:
-            if os.path.exists('data/processed_data.csv'):
-                if st.button("🗂️ Limpar Dados Processados", type="secondary"):
-                    # Remover arquivos de dados
-                    for file in os.listdir('data'):
-                        if file.endswith('.csv') and file != 'processing_history.csv':
-                            os.remove(os.path.join('data', file))
-                    st.success("✅ Dados processados removidos!")
-                    st.rerun()
+            # Botão para limpar todos os dados da base PostgreSQL
+            if st.button("🗂️ Limpar Todos os Dados", type="secondary"):
+                if 'confirm_clear_all' not in st.session_state:
+                    st.session_state.confirm_clear_all = False
+                
+                if not st.session_state.confirm_clear_all:
+                    st.warning("⚠️ Isso removerá TODOS os dados da base PostgreSQL!")
+                    if st.button("⚠️ CONFIRMAR LIMPEZA TOTAL", type="primary"):
+                        st.session_state.confirm_clear_all = True
+                        st.rerun()
+                else:
+                    # Executar limpeza da base PostgreSQL
+                    result = DatabaseManager.clear_all_data()
+                    if result:
+                        st.success("✅ Todos os dados foram removidos da base PostgreSQL!")
+                        st.session_state.confirm_clear_all = False
+                        st.rerun()
+                    else:
+                        st.error("❌ Erro ao limpar dados da base PostgreSQL")
         
     except Exception as e:
         st.error(f"❌ Erro ao carregar histórico: {str(e)}")
