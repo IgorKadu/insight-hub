@@ -31,29 +31,33 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 0.5rem 0;
     }
-    /* Ocultar o nome "app" e substituir por "Insight Hub" */
-    .css-1d391kg p {
-        display: none;
+    /* Substituir o nome "app" por "Insight Hub" - versões mais recentes do Streamlit */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: transparent !important;
+        position: relative;
     }
-    .css-1d391kg::before {
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p:first-child::after {
         content: "🚛 Insight Hub";
-        font-size: 18px;
+        color: #262730 !important;
         font-weight: bold;
-        color: #262730;
-        display: block;
-        padding: 1rem 0;
+        font-size: 16px;
+        position: absolute;
+        top: 0;
+        left: 0;
     }
-    /* Alternativa para diferentes versões do Streamlit */
-    [data-testid="stSidebar"] > div > div > div > div:first-child p {
-        display: none;
+    /* Alternativa para seletores mais específicos */
+    section[data-testid="stSidebar"] div:first-child div:first-child div:first-child div:first-child {
+        color: transparent !important;
+        position: relative;
     }
-    [data-testid="stSidebar"] > div > div > div > div:first-child::before {
+    section[data-testid="stSidebar"] div:first-child div:first-child div:first-child div:first-child::after {
         content: "🚛 Insight Hub";
-        font-size: 18px;
+        color: #262730 !important;
         font-weight: bold;
-        color: #262730;
-        display: block;
-        padding: 1rem 0;
+        font-size: 16px;
+        position: absolute;
+        top: 0;
+        left: 0;
     }
     </style>
 """, unsafe_allow_html=True)
