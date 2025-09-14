@@ -31,33 +31,41 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 0.5rem 0;
     }
-    /* Substituir o nome "app" por "Insight Hub" - versões mais recentes do Streamlit */
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+    /* Substituir o texto "app" no botão de navegação por "Insight Hub" */
+    [data-testid="stSidebar"] a[href="/"] p,
+    [data-testid="stSidebar"] a[href="/?nav=wide"] p,
+    [data-testid="stSidebar"] a[data-testid="stSidebarNavLink"] p,
+    [data-testid="stSidebar"] .stSidebarNav a:first-child p {
+        font-size: 0 !important;
         color: transparent !important;
         position: relative;
     }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p:first-child::after {
+    [data-testid="stSidebar"] a[href="/"] p::after,
+    [data-testid="stSidebar"] a[href="/?nav=wide"] p::after,
+    [data-testid="stSidebar"] a[data-testid="stSidebarNavLink"] p::after,
+    [data-testid="stSidebar"] .stSidebarNav a:first-child p::after {
         content: "🚛 Insight Hub";
+        font-size: 16px !important;
         color: #262730 !important;
-        font-weight: bold;
-        font-size: 16px;
+        font-weight: normal;
         position: absolute;
-        top: 0;
         left: 0;
+        top: 0;
     }
-    /* Alternativa para seletores mais específicos */
-    section[data-testid="stSidebar"] div:first-child div:first-child div:first-child div:first-child {
+    /* Seletor mais genérico para capturar o botão app */
+    [data-testid="stSidebar"] ul li:first-child a p {
+        font-size: 0 !important;
         color: transparent !important;
         position: relative;
     }
-    section[data-testid="stSidebar"] div:first-child div:first-child div:first-child div:first-child::after {
+    [data-testid="stSidebar"] ul li:first-child a p::after {
         content: "🚛 Insight Hub";
+        font-size: 16px !important;
         color: #262730 !important;
-        font-weight: bold;
-        font-size: 16px;
+        font-weight: normal;
         position: absolute;
-        top: 0;
         left: 0;
+        top: 0;
     }
     </style>
 """, unsafe_allow_html=True)
