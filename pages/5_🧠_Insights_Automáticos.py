@@ -791,7 +791,7 @@ def show_complete_report(insights, insights_generator, analyzer):
     
     with col_export1:
         # Export texto
-        if st.button("📄 Exportar como Texto", width=None):
+        if st.button("📄 Exportar como Texto", use_container_width=True):
             report_text = insights_generator.export_insights_to_text()
             st.download_button(
                 label="📥 Download Relatório TXT",
@@ -802,7 +802,7 @@ def show_complete_report(insights, insights_generator, analyzer):
     
     with col_export2:
         # Export CSV
-        if st.button("📊 Exportar como CSV", width=None):
+        if st.button("📊 Exportar como CSV", use_container_width=True):
             insights_df = pd.DataFrame([
                 {
                     'Timestamp': insight['timestamp'],
@@ -825,7 +825,7 @@ def show_complete_report(insights, insights_generator, analyzer):
     
     with col_export3:
         # Gerar novo relatório
-        if st.button("🔄 Gerar Novo Relatório", width=None):
+        if st.button("🔄 Gerar Novo Relatório", use_container_width=True):
             st.rerun()
     
     # Estatísticas do relatório

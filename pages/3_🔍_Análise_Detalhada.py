@@ -225,7 +225,7 @@ def show_overview_analysis(analyzer):
     
     st.dataframe(
         vehicle_stats,
-        width=None,
+        use_container_width=True,
         height=400
     )
     
