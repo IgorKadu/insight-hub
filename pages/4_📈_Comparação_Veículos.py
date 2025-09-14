@@ -19,25 +19,43 @@ st.set_page_config(
     layout="wide"
 )
 
+@st.cache_data(ttl=300)  # Cache por 5 minutos
 def load_data():
-    """Carrega dados APENAS da base de dados (dados reais)"""
+    """Carrega dados APENAS da base de dados (dados reais) com otimizações"""
     try:
         # Importar DatabaseManager
         from database.db_manager import DatabaseManager
         
-        # Carregar APENAS da base de dados - sem fallbacks fictícios
-        if DatabaseManager.has_data():
-            df = DatabaseManager.get_dashboard_data()
-            if not df.empty:
-                st.success(f"✅ Dados reais carregados: {len(df):,} registros da base de dados")
-                return df
+        # Verificar se há dados primeiro (mais rápido)
+        if not DatabaseManager.has_data():
+            st.warning("⚠️ Nenhum dado real encontrado na base de dados. Faça upload dos seus arquivos CSV.")
+            return pd.DataFrame()
         
-        # Se não há dados reais, mostrar mensagem clara
-        st.warning("⚠️ Nenhum dado real encontrado na base de dados. Faça upload dos seus arquivos CSV.")
+        # Carregar apenas últimos 30 dias para melhor performance
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        
+        with st.spinner("🔄 Carregando dados para comparação (últimos 30 dias)..."):
+            df = DatabaseManager.get_dashboard_data(
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            if not df.empty:
+                st.success(f"✅ Dados carregados: {len(df):,} registros (últimos 30 dias)")
+                return df
+            else:
+                # Se não há dados nos últimos 30 dias, carregar todos
+                df = DatabaseManager.get_dashboard_data()
+                if not df.empty:
+                    st.info(f"📊 Carregados todos os dados históricos: {len(df):,} registros")
+                    return df
+        
+        st.warning("⚠️ Nenhum dado encontrado na base de dados.")
         return pd.DataFrame()
         
     except Exception as e:
-        st.error(f"Erro ao carregar dados reais: {str(e)}")
+        st.error(f"Erro ao carregar dados: {str(e)}")
         return pd.DataFrame()
 
 def main():
@@ -52,8 +70,8 @@ def main():
         st.warning("📁 Nenhum dado encontrado. Faça o upload de um arquivo CSV primeiro.")
         st.stop()
     
-    # Inicializar analisador com dados da base de dados
-    analyzer = DataAnalyzer.from_database()
+    # Inicializar analisador com dados carregados (mais eficiente)
+    analyzer = DataAnalyzer(df)
     visualizer = FleetVisualizations(analyzer)
     
     # Sidebar com filtros

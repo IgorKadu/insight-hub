@@ -24,6 +24,20 @@ class AlertSystem:
         if df.empty:
             return alerts
         
+        # Validar e converter coluna de data
+        if 'data' not in df.columns:
+            return alerts
+            
+        # Converter para datetime de forma segura
+        df = df.copy()
+        df['data'] = pd.to_datetime(df['data'], errors='coerce')
+        
+        # Remover registros com data inválida
+        df = df.dropna(subset=['data'])
+        
+        if df.empty:
+            return alerts
+        
         # Filtrar últimas 24h - timezone correto
         from datetime import timezone
         cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -33,6 +47,9 @@ class AlertSystem:
             # Se dados não estão em UTC, converter
             if df['data'].dt.tz != timezone.utc:
                 cutoff = cutoff.astimezone(df['data'].dt.tz)
+        else:
+            # Se dados são naive, usar cutoff naive
+            cutoff = cutoff.replace(tzinfo=None)
         
         df_recent = df[df['data'] >= cutoff]
         
@@ -52,53 +69,83 @@ class AlertSystem:
     
     def _check_speed_alerts(self, df: pd.DataFrame) -> List[Dict]:
         alerts = []
-        for _, row in df.iterrows():
-            vel = row['velocidade_km']
+        if 'velocidade_km' not in df.columns:
+            return alerts
+            
+        # Filtrar apenas registros com velocidade > 0 para alertas
+        df_moving = df[df['velocidade_km'] > 0]
+        
+        for _, row in df_moving.iterrows():
+            vel = float(row['velocidade_km'])
             if vel > self.alert_configs['velocidade_critica']:
                 alerts.append({
                     'tipo': 'Velocidade Crítica',
                     'severidade': 'Alta',
                     'veiculo': row['placa'],
-                    'valor': f"{vel} km/h",
+                    'valor': f"{vel:.1f} km/h",
                     'timestamp': row['data'],
-                    'localizacao': row.get('endereco', 'N/A')
+                    'localizacao': row.get('endereco', 'Localização não disponível')
                 })
             elif vel > self.alert_configs['velocidade_maxima']:
                 alerts.append({
                     'tipo': 'Excesso de Velocidade',
                     'severidade': 'Média',
                     'veiculo': row['placa'],
-                    'valor': f"{vel} km/h",
+                    'valor': f"{vel:.1f} km/h",
                     'timestamp': row['data'],
-                    'localizacao': row.get('endereco', 'N/A')
+                    'localizacao': row.get('endereco', 'Localização não disponível')
                 })
         return alerts
     
     def _check_battery_alerts(self, df: pd.DataFrame) -> List[Dict]:
         alerts = []
-        if 'bateria' in df.columns:
-            df['bateria_num'] = pd.to_numeric(df['bateria'], errors='coerce')
-            low_battery = df[df['bateria_num'] < self.alert_configs['bateria_baixa']]
+        if 'battery_level' in df.columns:
+            # Converter battery_level para numérico (vem como string)
+            df_copy = df.copy()
+            df_copy['bateria_num'] = pd.to_numeric(df_copy['battery_level'], errors='coerce')
             
-            for _, row in low_battery.iterrows():
-                bat = row['bateria_num']
-                severity = 'Alta' if bat < self.alert_configs['bateria_critica'] else 'Média'
-                alerts.append({
-                    'tipo': 'Bateria Baixa',
-                    'severidade': severity,
-                    'veiculo': row['placa'],
-                    'valor': f"{bat:.1f}V",
-                    'timestamp': row['data'],
-                    'localizacao': row.get('endereco', 'N/A')
-                })
+            # Filtrar apenas valores válidos
+            df_copy = df_copy.dropna(subset=['bateria_num'])
+            
+            if not df_copy.empty:
+                # Alertas de bateria baixa (abaixo de 12V)
+                low_battery = df_copy[df_copy['bateria_num'] < self.alert_configs['bateria_baixa']]
+                
+                for _, row in low_battery.iterrows():
+                    bat = row['bateria_num']
+                    severity = 'Alta' if bat < self.alert_configs['bateria_critica'] else 'Média'
+                    alerts.append({
+                        'tipo': 'Bateria Baixa',
+                        'severidade': severity,
+                        'veiculo': row['placa'],
+                        'valor': f"{bat:.1f}V",
+                        'timestamp': row['data'],
+                        'localizacao': row.get('endereco', 'Localização não disponível')
+                    })
         return alerts
     
     def _check_night_usage(self, df: pd.DataFrame) -> List[Dict]:
         alerts = []
-        df['hora'] = df['data'].dt.hour
-        night_usage = df[
-            (df['hora'] >= self.alert_configs['uso_noturno_inicio']) | 
-            (df['hora'] <= self.alert_configs['uso_noturno_fim'])
+        if 'data' not in df.columns:
+            return alerts
+            
+        # Trabalhar com cópia para não modificar original
+        df_copy = df.copy()
+        
+        # Converter para datetime se necessário
+        if not pd.api.types.is_datetime64_any_dtype(df_copy['data']):
+            df_copy['data'] = pd.to_datetime(df_copy['data'], errors='coerce')
+            
+        # Remover registros com data inválida
+        df_copy = df_copy.dropna(subset=['data'])
+        
+        if df_copy.empty:
+            return alerts
+            
+        df_copy['hora'] = df_copy['data'].dt.hour
+        night_usage = df_copy[
+            (df_copy['hora'] >= self.alert_configs['uso_noturno_inicio']) | 
+            (df_copy['hora'] <= self.alert_configs['uso_noturno_fim'])
         ]
         
         if len(night_usage) > 10:  # Mais de 10 registros noturnos

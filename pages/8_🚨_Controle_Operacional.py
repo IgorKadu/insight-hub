@@ -136,23 +136,33 @@ def main():
     with tab4:
         show_detailed_report(df)
 
+@st.cache_data(ttl=300)
 def get_client_list():
-    """Busca lista de clientes"""
+    """Busca lista de clientes com cache para melhor performance"""
     try:
-        clients = DatabaseManager.get_client_list()
-        return clients
-    except:
+        if DatabaseManager.has_data():
+            df = DatabaseManager.get_dashboard_data()
+            if not df.empty and 'cliente' in df.columns:
+                return sorted(df['cliente'].unique().tolist())
+        return []
+    except Exception as e:
+        st.error(f"Erro ao carregar clientes: {str(e)}")
         return []
 
+@st.cache_data(ttl=300)
 def get_vehicle_list(client_filter=None):
-    """Busca lista de veículos"""
+    """Busca lista de veículos com cache para melhor performance"""
     try:
-        # Implementar busca de veículos filtrados por cliente se necessário
-        df = DatabaseManager.get_dashboard_data(client_filter=client_filter)
-        if not df.empty:
-            return sorted(df['placa'].unique().tolist())
+        if DatabaseManager.has_data():
+            df = DatabaseManager.get_dashboard_data()
+            if not df.empty and 'placa' in df.columns:
+                # Filtrar por cliente se especificado
+                if client_filter and client_filter != "Todos":
+                    df = df[df['cliente'] == client_filter]
+                return sorted(df['placa'].unique().tolist())
         return []
-    except:
+    except Exception as e:
+        st.error(f"Erro ao carregar veículos: {str(e)}")
         return []
 
 def load_filtered_data(client_filter, vehicle_filter, start_date, end_date):

@@ -435,7 +435,7 @@ def show_opportunities(insights, analyzer):
         # Identificar top performers e underperformers
         vehicle_efficiency = efficiency['eficiencia_por_veiculo']
         
-        if vehicle_efficiency:
+        if vehicle_efficiency is not None and hasattr(vehicle_efficiency, 'empty') and not vehicle_efficiency.empty:
             # Converter series para lista de dicts
             efficiency_data = []
             for placa, data in vehicle_efficiency.items():
