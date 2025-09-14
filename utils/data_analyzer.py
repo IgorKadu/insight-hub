@@ -57,10 +57,14 @@ class DataAnalyzer:
             filtered = filtered[filtered['placa'] == placa]
         
         if data_inicio:
-            filtered = filtered[filtered['data'] >= pd.Timestamp(data_inicio)]
+            # Garantir timezone compatível
+            data_inicio_tz = pd.Timestamp(data_inicio, tz='UTC')
+            filtered = filtered[filtered['data'] >= data_inicio_tz]
         
         if data_fim:
-            filtered = filtered[filtered['data'] <= pd.Timestamp(data_fim)]
+            # Garantir timezone compatível  
+            data_fim_tz = pd.Timestamp(data_fim, tz='UTC')
+            filtered = filtered[filtered['data'] <= data_fim_tz]
         
         self.filtered_df = filtered
         return filtered
