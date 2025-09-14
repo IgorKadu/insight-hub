@@ -79,6 +79,31 @@ class DataAnalyzer:
         self.filtered_df = filtered
         return filtered
     
+    def _calculate_total_hours(self, time_series):
+        """Converte série de tempo (HH:MM:SS) para total de horas"""
+        total_hours = 0.0
+        for time_str in time_series:
+            if pd.isna(time_str) or time_str == '' or time_str == '0':
+                continue
+            try:
+                # Parse formato HH:MM:SS
+                parts = str(time_str).split(':')
+                if len(parts) >= 3:
+                    hours = int(parts[0])
+                    minutes = int(parts[1])
+                    seconds = int(parts[2])
+                    total_hours += hours + (minutes / 60.0) + (seconds / 3600.0)
+                elif len(parts) == 2:  # HH:MM
+                    hours = int(parts[0])
+                    minutes = int(parts[1])
+                    total_hours += hours + (minutes / 60.0)
+                elif len(parts) == 1:  # Apenas horas
+                    total_hours += float(parts[0])
+            except (ValueError, IndexError):
+                # Ignorar valores inválidos
+                continue
+        return float(total_hours)
+    
     def get_kpis(self):
         """Calcula KPIs principais"""
         if self.filtered_df.empty:
@@ -87,15 +112,15 @@ class DataAnalyzer:
         df = self.filtered_df
         
         kpis = {
-            'total_veiculos': df['placa'].nunique(),
-            'total_registros': len(df),
-            'velocidade_media': df['velocidade_km'].mean(),
-            'velocidade_maxima': df['velocidade_km'].max(),
-            'distancia_total': df['odometro_periodo_km'].sum(),
-            'tempo_ativo_horas': df['horimetro_periodo'].sum() if 'horimetro_periodo' in df.columns else 0,
-            'cobertura_gps': (df['gps'].sum() / len(df)) * 100,
-            'veiculos_bloqueados': df['bloqueado'].sum(),
-            'periodo_dias': (df['data'].max() - df['data'].min()).days + 1 if len(df) > 0 else 0
+            'total_veiculos': int(df['placa'].nunique()),
+            'total_registros': int(len(df)),
+            'velocidade_media': float(df['velocidade_km'].mean()),
+            'velocidade_maxima': float(df['velocidade_km'].max()),
+            'distancia_total': float(df['odometro_periodo_km'].sum()),
+            'tempo_ativo_horas': self._calculate_total_hours(df['horimetro_periodo']) if 'horimetro_periodo' in df.columns else 0.0,
+            'cobertura_gps': float((df['gps'].sum() / len(df)) * 100),
+            'veiculos_bloqueados': int(df['bloqueado'].sum()),
+            'periodo_dias': int((df['data'].max() - df['data'].min()).days + 1) if len(df) > 0 else 0
         }
         
         return kpis
