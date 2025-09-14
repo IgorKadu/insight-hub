@@ -165,10 +165,48 @@ with tab1:
             lambda x: [255, 0, 0, 160] if x > speed_threshold else [0, 255, 0, 160]  # [R, G, B, A]
         )
         
-        # Tooltip para interatividade
+        # Preparar dados formatados para tooltip
+        map_data['velocidade_formatada'] = map_data['velocidade_km'].apply(lambda x: f"{x:.1f} km/h")
+        map_data['data_formatada'] = pd.to_datetime(map_data['data'], errors='coerce').dt.strftime('%d/%m/%Y %H:%M')
+        map_data['status_velocidade'] = map_data['velocidade_km'].apply(
+            lambda x: "⚠️ Acima do limite" if x > speed_threshold else "✅ Velocidade normal"
+        )
+        
+        # Adicionar endereço se disponível, senão usar região baseada nas coordenadas
+        if 'endereco' in map_data.columns and not map_data['endereco'].isna().all():
+            map_data['local_formatado'] = map_data['endereco'].fillna("Localização não identificada")
+        else:
+            # Simplificar coordenadas para tooltip mais limpo
+            map_data['local_formatado'] = map_data.apply(
+                lambda row: f"Lat: {row['latitude']:.4f}, Lon: {row['longitude']:.4f}", axis=1
+            )
+        
+        # Cliente e motorista se disponível
+        info_adicional = ""
+        if 'cliente' in map_data.columns:
+            map_data['info_cliente'] = map_data['cliente'].fillna("Cliente não informado")
+        if 'motorista' in map_data.columns:
+            map_data['info_motorista'] = map_data['motorista'].fillna("Motorista não informado")
+        
+        # Tooltip otimizado para usuários finais
         tooltip_text = {
-            "html": "<b>Veículo:</b> {placa}<br/><b>Velocidade:</b> {velocidade_km:.1f} km/h<br/><b>Data:</b> {data}<br/><b>Coordenadas:</b> {latitude:.6f}, {longitude:.6f}",
-            "style": {"backgroundColor": "steelblue", "color": "white"}
+            "html": """
+            <div style='padding: 8px; max-width: 300px;'>
+                <h4 style='margin: 0 0 8px 0; color: #2E86C1;'>🚛 {placa}</h4>
+                <p style='margin: 2px 0;'><b>Velocidade:</b> {velocidade_formatada}</p>
+                <p style='margin: 2px 0;'><b>Status:</b> {status_velocidade}</p>
+                <p style='margin: 2px 0;'><b>Data/Hora:</b> {data_formatada}</p>
+                <p style='margin: 2px 0;'><b>Local:</b> {local_formatado}</p>
+            </div>
+            """,
+            "style": {
+                "backgroundColor": "rgba(255, 255, 255, 0.95)", 
+                "color": "#333333",
+                "border": "1px solid #ccc",
+                "borderRadius": "8px",
+                "fontSize": "12px",
+                "fontFamily": "Arial, sans-serif"
+            }
         }
         
         # Configurar visualização inicial
