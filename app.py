@@ -15,10 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Configuração da sidebar
-st.sidebar.markdown("---")
-
-# CSS customizado para melhor aparência
+# CSS customizado para melhor aparência e substituir nome "app"
 st.markdown("""
     <style>
     .main-header {
@@ -33,6 +30,30 @@ st.markdown("""
         padding: 1rem;
         border-radius: 0.5rem;
         margin: 0.5rem 0;
+    }
+    /* Ocultar o nome "app" e substituir por "Insight Hub" */
+    .css-1d391kg p {
+        display: none;
+    }
+    .css-1d391kg::before {
+        content: "🚛 Insight Hub";
+        font-size: 18px;
+        font-weight: bold;
+        color: #262730;
+        display: block;
+        padding: 1rem 0;
+    }
+    /* Alternativa para diferentes versões do Streamlit */
+    [data-testid="stSidebar"] > div > div > div > div:first-child p {
+        display: none;
+    }
+    [data-testid="stSidebar"] > div > div > div > div:first-child::before {
+        content: "🚛 Insight Hub";
+        font-size: 18px;
+        font-weight: bold;
+        color: #262730;
+        display: block;
+        padding: 1rem 0;
     }
     </style>
 """, unsafe_allow_html=True)
