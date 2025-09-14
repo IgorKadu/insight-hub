@@ -510,7 +510,7 @@ def show_violations(df):
     
     st.dataframe(
         display_df.head(100),  # Limitar a 100 registros para performance
-        use_container_width=True,
+        width=None,
         hide_index=True
     )
     

@@ -148,10 +148,11 @@ def main():
 def show_executive_summary(insights, analyzer):
     """Mostra resumo executivo dos insights"""
     st.header("📊 Resumo Executivo")
+    st.markdown("**Visão geral da performance da sua frota com recomendações práticas**")
     
     kpis = analyzer.get_kpis()
     
-    # KPIs principais
+    # KPIs principais com contexto
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -201,17 +202,38 @@ def show_executive_summary(insights, analyzer):
         )
         st.plotly_chart(fig_insights, use_container_width=True)
     
-    # Top 3 insights mais importantes
-    st.subheader("🎯 Principais Insights")
+    # Top 3 insights mais importantes - versão melhorada
+    st.subheader("🎯 Ações Prioritárias para Sua Frota")
+    st.markdown("**As 3 ações mais importantes que você deve tomar agora:**")
     
     priority_insights = sorted(insights, key=lambda x: x['priority'])[:3]
     
     for i, insight in enumerate(priority_insights):
-        icon = "🚨" if insight['type'] == 'error' else "⚠️" if insight['type'] == 'warning' else "ℹ️"
+        icon = "🚨" if insight['type'] == 'error' else "⚠️" if insight['type'] == 'warning' else "✅" if insight['type'] == 'success' else "ℹ️"
+        priority_label = "URGENTE" if insight['type'] == 'error' else "IMPORTANTE" if insight['type'] == 'warning' else "POSITIVO" if insight['type'] == 'success' else "INFORMATIVO"
         
-        with st.expander(f"{icon} {insight['title']}", expanded=i == 0):
-            st.write(f"**Descrição:** {insight['description']}")
-            st.write(f"**Recomendação:** {insight['recommendation']}")
+        with st.container():
+            if insight['type'] == 'error':
+                st.error(f"{icon} **PRIORIDADE {priority_label}:** {insight['title']}")
+            elif insight['type'] == 'warning':
+                st.warning(f"{icon} **PRIORIDADE {priority_label}:** {insight['title']}")
+            else:
+                st.info(f"{icon} **{priority_label}:** {insight['title']}")
+            
+            col_insight1, col_insight2 = st.columns([2, 1])
+            with col_insight1:
+                st.markdown(f"**💡 O que fazer:** {insight['recommendation']}")
+                st.markdown(f"**📝 Por quê:** {insight['description']}")
+            
+            with col_insight2:
+                if insight['type'] == 'error':
+                    st.metric("⏰ Prazo", "24-48 horas", delta="URGENTE")
+                elif insight['type'] == 'warning':
+                    st.metric("⏰ Prazo", "1-2 semanas", delta="Importante")
+                else:
+                    st.metric("📊 Status", "Monitorar", delta="Positivo")
+            
+            st.markdown("---")
             
             # Adicionar métricas relacionadas se disponível
             if 'compliance' in insight['title'].lower():
@@ -260,8 +282,9 @@ def show_executive_summary(insights, analyzer):
     st.plotly_chart(fig_gauge, use_container_width=True)
 
 def show_critical_alerts(insights, analyzer):
-    """Mostra alertas críticos"""
+    """Mostra alertas críticos com planos de ação claros"""
     st.header("🚨 Alertas Críticos")
+    st.markdown("**Problemas que precisam de sua atenção imediata com planos de ação específicos**")
     
     critical_insights = [i for i in insights if i['type'] == 'error']
     warning_insights = [i for i in insights if i['type'] == 'warning']
@@ -355,18 +378,21 @@ def show_critical_alerts(insights, analyzer):
                                      annotation_text="Limite Mínimo: 70%")
                 st.plotly_chart(fig_problems, use_container_width=True)
     
-    # Plano de ação recomendado
-    st.subheader("📋 Plano de Ação Recomendado")
+    # Plano de ação recomendado - versão melhorada
+    st.subheader("📋 Plano de Ação Detalhado")
+    st.markdown("**Cronograma específico para resolver os problemas identificados:**")
     
     action_plan = []
     
     if critical_insights:
-        action_plan.append({
-            'Prioridade': 'ALTA',
-            'Prazo': 'Imediato (24h)',
-            'Ação': 'Resolver alertas críticos identificados',
-            'Responsável': 'Gestor de Frota'
-        })
+        for insight in critical_insights:
+            action_plan.append({
+                'Prioridade': '🚨 CRÍTICA',
+                'Prazo': '24-48 horas',
+                'Ação': f"Resolver: {insight['title']}",
+                'Como Fazer': insight['recommendation'],
+                'Responsável': 'Gestor de Frota + Equipe Técnica'
+            })
     
     if warning_insights:
         action_plan.append({
@@ -389,8 +415,9 @@ def show_critical_alerts(insights, analyzer):
         st.dataframe(action_df, use_container_width=True, hide_index=True)
 
 def show_opportunities(insights, analyzer):
-    """Mostra oportunidades de melhoria"""
-    st.header("📈 Oportunidades de Melhoria")
+    """Mostra oportunidades de melhoria com potencial de economia"""
+    st.header("📈 Oportunidades de Economia e Melhoria")
+    st.markdown("**Onde você pode economizar dinheiro e melhorar a eficiência da sua frota**")
     
     info_insights = [i for i in insights if i['type'] == 'info']
     success_insights = [i for i in insights if i['type'] == 'success']
@@ -409,13 +436,17 @@ def show_opportunities(insights, analyzer):
                     st.write(f"🎯 **Oportunidade:** {insight['recommendation']}")
                 
                 with col_opp2:
-                    # Estimar impacto potencial
+                    # Estimar impacto potencial com valores em reais
+                    kpis = analyzer.get_kpis()
+                    num_vehicles = kpis.get('total_veiculos', 1)
+                    
                     if 'velocidade' in insight['title'].lower():
-                        st.metric("Economia Potencial", "15-25%", delta="Combustível")
+                        economy_month = num_vehicles * 300  # R$ 300/mês por veículo em combustível
+                        st.metric("💰 Economia/Mês", f"R$ {economy_month:,}", delta="Combustível")
                     elif 'gps' in insight['title'].lower():
-                        st.metric("Melhoria Esperada", "10-20%", delta="Rastreamento")
+                        st.metric("📊 Melhoria", "10-20%", delta="Controle")
                     else:
-                        st.metric("Impacto", "Médio", delta="Operacional")
+                        st.metric("⚡ Impacto", "Médio", delta="Eficiência")
                 
                 st.markdown("---")
     
@@ -508,13 +539,14 @@ def show_opportunities(insights, analyzer):
                 st.metric("Investimento", opp['Investimento'])
 
 def show_predictions(insights, analyzer):
-    """Mostra predições e tendências"""
-    st.header("🔮 Predições e Tendências")
+    """Mostra predições práticas para planejamento"""
+    st.header("🔮 Previsões para Planejamento")
+    st.markdown("**Prepare-se para o que está por vir: manutenções, custos e necessidades da frota**")
     
     df = analyzer.filtered_df
     
     if len(df) < 14:  # Menos de 2 semanas de dados
-        st.warning("⚠️ Dados insuficientes para análises preditivas. Necessário pelo menos 14 dias de dados.")
+        st.warning("⚠️ **Dados insuficientes para previsões.** Carregue pelo menos 14 dias de dados para ter previsões confiáveis.")
         return
     
     # Análise de tendências
@@ -561,8 +593,9 @@ def show_predictions(insights, analyzer):
                 delta=f"{trends['activity']*100:.1f}%"
             )
     
-    # Predições para próximo período
-    st.subheader("🔮 Predições para os Próximos 30 Dias")
+    # Predições para próximo período - versão melhorada
+    st.subheader("📅 O que Esperar nos Próximos 30 Dias")
+    st.markdown("**Planeje-se para estas necessidades previstas da sua frota:**")
     
     predictions = []
     
@@ -576,12 +609,15 @@ def show_predictions(insights, analyzer):
             
             predicted_km_month = daily_avg * 30
             
+            days_to_maintenance = int(5000/daily_avg)
+            cost_estimate = 800  # Estimativa de custo de manutenção
             predictions.append({
-                'Tipo': 'Manutenção Preventiva',
+                'Tipo': '🔧 Manutenção',
                 'Veículo': placa,
-                'Predição': f'Necessitará revisão em ~{int(5000/daily_avg)} dias',
-                'Confiança': '85%',
-                'Ação': 'Agendar manutenção preventiva'
+                'Quando': f'Em {days_to_maintenance} dias',
+                'Custo Estimado': f'R$ {cost_estimate:,}',
+                'Ação Necessária': 'Agendar revisão preventiva',
+                'Confiança': '85%'
             })
     
     # Predição de compliance
@@ -591,11 +627,12 @@ def show_predictions(insights, analyzer):
         
         for placa in declining_vehicles:
             predictions.append({
-                'Tipo': 'Compliance',
+                'Tipo': '⚠️ Compliance',
                 'Veículo': placa,
-                'Predição': 'Risco de violações aumentado',
-                'Confiança': '75%',
-                'Ação': 'Monitoramento intensivo recomendado'
+                'Quando': 'Próximas 2 semanas',
+                'Custo Estimado': 'R$ 500-2.000 (multas)',
+                'Ação Necessária': 'Treinamento urgente do motorista',
+                'Confiança': '75%'
             })
     
     # Exibir predições
@@ -754,7 +791,7 @@ def show_complete_report(insights, insights_generator, analyzer):
     
     with col_export1:
         # Export texto
-        if st.button("📄 Exportar como Texto", use_container_width=True):
+        if st.button("📄 Exportar como Texto", width=None):
             report_text = insights_generator.export_insights_to_text()
             st.download_button(
                 label="📥 Download Relatório TXT",
@@ -765,7 +802,7 @@ def show_complete_report(insights, insights_generator, analyzer):
     
     with col_export2:
         # Export CSV
-        if st.button("📊 Exportar como CSV", use_container_width=True):
+        if st.button("📊 Exportar como CSV", width=None):
             insights_df = pd.DataFrame([
                 {
                     'Timestamp': insight['timestamp'],
@@ -788,7 +825,7 @@ def show_complete_report(insights, insights_generator, analyzer):
     
     with col_export3:
         # Gerar novo relatório
-        if st.button("🔄 Gerar Novo Relatório", use_container_width=True):
+        if st.button("🔄 Gerar Novo Relatório", width=None):
             st.rerun()
     
     # Estatísticas do relatório

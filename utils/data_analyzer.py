@@ -42,14 +42,22 @@ class DataAnalyzer:
             return cls(empty_df)
     
     def apply_filters(self, cliente=None, placa=None, data_inicio=None, data_fim=None):
-        """Aplica filtros aos dados"""
-        filtered = self.df.copy()
+        """Aplica filtros aos dados com tratamento robusto para 'TODOS'"""
+        try:
+            filtered = self.df.copy()
+            
+            # Filtro por cliente - garantir que "Todos" não cause problemas
+            if cliente and cliente not in ["Todos", "TODOS", None]:
+                filtered = filtered[filtered['cliente'] == cliente]
+            
+            # Filtro por placa - garantir que "Todos" não cause problemas  
+            if placa and placa not in ["Todos", "TODOS", None]:
+                filtered = filtered[filtered['placa'] == placa]
         
-        if cliente and cliente != "Todos":
-            filtered = filtered[filtered['cliente'] == cliente]
-        
-        if placa and placa != "Todos":
-            filtered = filtered[filtered['placa'] == placa]
+        except Exception as e:
+            # Em caso de erro, retornar dados originais sem filtros
+            print(f"Erro ao aplicar filtros: {str(e)}")
+            filtered = self.df.copy()
         
         # Verificar se há dados e se a coluna 'data' existe e é datetime
         if not filtered.empty and 'data' in filtered.columns:

@@ -537,7 +537,7 @@ def show_processing_history():
             # Mostrar tabela
             st.dataframe(
                 history_df[['Nome do Arquivo', 'Data/Hora', 'Registros', 'Veículos', 'Clientes', 'Status']], 
-                use_container_width=True,
+                width=None,
                 hide_index=True
             )
             
@@ -652,7 +652,7 @@ def show_processing_history_old():
         
         st.dataframe(
             display_df[display_columns].head(10),
-            use_container_width=True,
+            width=None,
             hide_index=True
         )
         

@@ -231,7 +231,7 @@ def main():
     
     st.dataframe(
         vehicle_summary,
-        use_container_width=True,
+        width=None,
         height=300
     )
     

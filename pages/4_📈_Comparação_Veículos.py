@@ -137,7 +137,7 @@ def main():
         st.subheader("📊 Veículos Disponíveis")
         st.dataframe(
             vehicle_stats.head(10),
-            use_container_width=True,
+            width=None,
             height=300
         )
     
