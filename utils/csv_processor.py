@@ -216,7 +216,7 @@ class CSVProcessor:
             
             # Converter horímetros
             if 'horimetro_periodo' in clean_df.columns:
-                clean_df['horimetro_periodo_horas'] = clean_df['horimetro_periodo'].apply(
+                clean_df['horimetro_periodo'] = clean_df['horimetro_periodo'].apply(
                     self.convert_time_to_hours
                 )
             

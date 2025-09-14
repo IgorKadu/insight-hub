@@ -78,11 +78,18 @@ if veiculo_selecionado != 'Todos':
 
 # Filtro de período
 if periodo != 'Todos':
-    data_limite = datetime.now()
+    from datetime import timezone
+    data_limite = datetime.now(timezone.utc)
     if periodo == 'Últimos 7 dias':
         data_limite -= timedelta(days=7)
     elif periodo == 'Últimos 30 dias':
         data_limite -= timedelta(days=30)
+    
+    # Converter para o timezone dos dados se necessário
+    if df_filtrado['data'].dt.tz is not None and df_filtrado['data'].dt.tz != timezone.utc:
+        data_limite = data_limite.astimezone(df_filtrado['data'].dt.tz)
+    elif df_filtrado['data'].dt.tz is None:
+        data_limite = data_limite.replace(tzinfo=None)
     
     df_filtrado = df_filtrado[df_filtrado['data'] >= data_limite]
 

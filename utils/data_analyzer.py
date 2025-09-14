@@ -26,7 +26,7 @@ class DataAnalyzer:
                 print("⚠️ Nenhum dado real encontrado na base de dados")
                 df = pd.DataFrame(columns=[
                     'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
-                    'gps', 'bloqueado', 'horimetro_periodo_horas'
+                    'gps', 'bloqueado', 'horimetro_periodo'
                 ])
             else:
                 # Buscar dados da base de dados com filtros
@@ -42,7 +42,7 @@ class DataAnalyzer:
             # Em caso de erro, retornar analisador com DataFrame vazio
             empty_df = pd.DataFrame(columns=[
                 'cliente', 'placa', 'data', 'velocidade_km', 'odometro_periodo_km',
-                'gps', 'bloqueado', 'horimetro_periodo_horas'
+                'gps', 'bloqueado', 'horimetro_periodo'
             ])
             return cls(empty_df)
     
@@ -92,7 +92,7 @@ class DataAnalyzer:
             'velocidade_media': df['velocidade_km'].mean(),
             'velocidade_maxima': df['velocidade_km'].max(),
             'distancia_total': df['odometro_periodo_km'].sum(),
-            'tempo_ativo_horas': df['horimetro_periodo_horas'].sum() if 'horimetro_periodo_horas' in df.columns else 0,
+            'tempo_ativo_horas': df['horimetro_periodo'].sum() if 'horimetro_periodo' in df.columns else 0,
             'cobertura_gps': (df['gps'].sum() / len(df)) * 100,
             'veiculos_bloqueados': df['bloqueado'].sum(),
             'periodo_dias': (df['data'].max() - df['data'].min()).days + 1 if len(df) > 0 else 0
@@ -139,7 +139,7 @@ class DataAnalyzer:
         vehicle_stats = df.groupby('placa').agg({
             'velocidade_km': ['mean', 'max', 'count'],
             'odometro_periodo_km': 'sum',
-            'horimetro_periodo_horas': 'sum' if 'horimetro_periodo_horas' in df.columns else lambda x: 0,
+            'horimetro_periodo': 'sum' if 'horimetro_periodo' in df.columns else lambda x: 0,
             'gps': 'mean',
             'bloqueado': 'any'
         }).round(2)
@@ -227,7 +227,7 @@ class DataAnalyzer:
                     'velocidade_media': vehicle_data['velocidade_km'].mean(),
                     'velocidade_maxima': vehicle_data['velocidade_km'].max(),
                     'distancia_total': vehicle_data['odometro_periodo_km'].sum(),
-                    'tempo_ativo': vehicle_data['horimetro_periodo_horas'].sum() if 'horimetro_periodo_horas' in vehicle_data.columns else 0,
+                    'tempo_ativo': vehicle_data['horimetro_periodo'].sum() if 'horimetro_periodo' in vehicle_data.columns else 0,
                     'cobertura_gps': (vehicle_data['gps'].mean() * 100),
                     'violacoes_velocidade': len(vehicle_data[vehicle_data['velocidade_km'] > 80]),
                     'bloqueios': vehicle_data['bloqueado'].sum()

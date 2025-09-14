@@ -154,17 +154,27 @@ class InsightsGenerator:
             return
         
         # Insight sobre padrões de uso por hora
-        if 'padroes_por_hora' in patterns:
+        if 'padroes_por_hora' in patterns and patterns['padroes_por_hora'] is not None:
             hourly_data = patterns['padroes_por_hora']
-            peak_hour = hourly_data['placa_nunique'].idxmax()
-            peak_vehicles = hourly_data.loc[peak_hour, 'placa_nunique']
             
-            self.add_insight(
-                "⏰ Pico de Utilização",
-                f"Maior utilização às {peak_hour}h com {peak_vehicles} veículos ativos.",
-                "Considere balanceamento de carga em outros horários.",
-                "info"
-            )
+            # Se hourly_data é um DataFrame com dados válidos
+            if isinstance(hourly_data, pd.DataFrame) and not hourly_data.empty:
+                # Verificar se tem índice ou coluna de hora
+                if hourly_data.index.name == 'hora' or 'hora' in hourly_data.columns:
+                    # Usar a primeira coluna numérica disponível como proxy para atividade
+                    numeric_cols = hourly_data.select_dtypes(include=[np.number]).columns
+                    if len(numeric_cols) > 0:
+                        activity_col = numeric_cols[0]
+                        peak_hour = hourly_data[activity_col].idxmax()
+                        peak_value = hourly_data.loc[peak_hour, activity_col]
+                        
+                        self.add_insight(
+                            "⏰ Pico de Utilização",
+                            f"Maior atividade registrada às {peak_hour}h.",
+                            "Considere balanceamento de carga em outros horários.",
+                            "info"
+                        )
+                        return
         
         # Insight sobre veículos inativos
         if 'estatisticas_por_veiculo' in operational:
@@ -211,7 +221,7 @@ class InsightsGenerator:
         # Predição de manutenção baseada em uso
         vehicle_usage = df.groupby('placa').agg({
             'odometro_periodo_km': 'sum',
-            'horimetro_periodo_horas': 'sum' if 'horimetro_periodo_horas' in df.columns else lambda x: 0
+            'horimetro_periodo': 'sum' if 'horimetro_periodo' in df.columns else lambda x: 0
         })
         
         for placa, data in vehicle_usage.iterrows():

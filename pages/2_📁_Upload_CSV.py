@@ -175,36 +175,12 @@ def process_single_csv_file(uploaded_file):
         
         return result
         
-        if errors:
-            st.error("❌ Erros encontrados durante o processamento:")
-            for error in errors:
-                st.error(f"• {error}")
-            st.stop()
-        
-        if processed_df is None:
-            st.error("❌ Falha no processamento do arquivo.")
-            st.stop()
-        
-        # Mostrar resultado do processamento
-        st.success("✅ Arquivo processado com sucesso!")
-        
-        # Mostrar resumo
-        summary = processor.get_data_summary(processed_df)
-        show_processing_summary(summary, uploaded_file.name)
-        
-        # Salvar registro do processamento
-        save_processing_record(uploaded_file.name, summary)
-        
-        # Mostrar preview dos dados processados
-        st.subheader("📊 Dados Processados")
-        st.dataframe(
-            processed_df.head(10),
-            use_container_width=True
-        )
-        
-        # Botão para ir ao dashboard
-        if st.button("📊 Ir para Dashboard", type="primary"):
-            st.switch_page("pages/1_📊_Dashboard.py")
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Erro no processamento: {str(e)}',
+            'records_processed': 0
+        }
 
 def show_processing_summary(summary, filename):
     """Mostra resumo do processamento"""
