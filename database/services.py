@@ -396,15 +396,22 @@ class FleetDatabaseService:
         telematics_count = self.session.query(TelematicsData).count()
         history_count = self.session.query(ProcessingHistory).count()
         insights_count = self.session.query(InsightData).count()
+        vehicles_count = self.session.query(Vehicle).count()
+        clients_count = self.session.query(Client).count()
         
+        # Clear all data
         self.session.query(TelematicsData).delete()
-        self.session.query(ProcessingHistory).delete()
+        self.session.query(ProcessingHistory).delete() 
         self.session.query(InsightData).delete()
+        self.session.query(Vehicle).delete()
+        self.session.query(Client).delete()
         
         return {
-            'telematics_records': telematics_count,
-            'processing_history': history_count,
-            'insights': insights_count
+            'telematics_data': telematics_count,
+            'processing_history': history_count, 
+            'insights': insights_count,
+            'vehicles': vehicles_count,
+            'clients': clients_count
         }
     
     # Insights operations

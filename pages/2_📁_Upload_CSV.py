@@ -535,15 +535,41 @@ def show_processing_history():
     except Exception as e:
         st.error(f"❌ Erro ao carregar histórico: {str(e)}")
         
-    # Botão para limpar histórico
-    if st.button("🗑️ Limpar Histórico", type="secondary", help="Remove todos os registros do histórico (não remove os dados)"):
-        if st.warning("⚠️ Tem certeza que deseja limpar o histórico? Esta ação não pode ser desfeita."):
-            try:
-                # Implementar função para limpar histórico se necessário
-                st.success("Histórico limpo com sucesso!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao limpar histórico: {str(e)}")
+    # Botões de ação  
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🗑️ Limpar Histórico", type="secondary", help="Remove apenas os registros do histórico (mantém os dados)"):
+            # Implementar limpeza do histórico se necessário
+            st.info("Funcionalidade de limpeza de histórico será implementada.")
+    
+    with col2:
+        if st.button("🗂️ Limpar Todos os Dados", type="secondary", help="Remove TODOS os dados da base (histórico + registros)"):
+            st.warning("⚠️ **ATENÇÃO**: Esta ação irá remover TODOS os dados da base de dados!")
+            
+            # Confirmation dialog
+            if st.button("✅ Confirmar Limpeza Completa", type="primary"):
+                try:
+                    # Clear all data from database
+                    result = DatabaseManager.clear_all_data()
+                    
+                    st.success(f"""
+                    🎉 **Limpeza completa realizada com sucesso!**
+                    
+                    **Dados removidos:**
+                    - 🗂️ {result.get('telematics_data', 0):,} registros telemétricos
+                    - 📋 {result.get('processing_history', 0)} registros de histórico  
+                    - 🚗 {result.get('vehicles', 0)} veículos
+                    - 🏢 {result.get('clients', 0)} clientes
+                    
+                    **Sistema resetado!** Agora você pode fazer novos uploads.
+                    """)
+                    
+                    # Recarregar a página para refletir mudanças
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erro ao limpar dados: {str(e)}")
 
 def show_processing_history_old():
     """Mostra histórico de processamentos (versão antiga usando arquivo)"""
