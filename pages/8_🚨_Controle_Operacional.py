@@ -106,7 +106,14 @@ def main():
         )
     
     # Aplicar filtros aos dados já carregados
-    df = apply_filters_to_data(df_inicial, selected_client, selected_vehicle, start_date, end_date)
+    # Usar método centralizado de filtros do DataAnalyzer
+    analyzer = DataAnalyzer(df_inicial)
+    df = analyzer.apply_filters(
+        cliente=selected_client,
+        placa=selected_vehicle,
+        data_inicio=start_date,
+        data_fim=end_date
+    )
     
     # Aplicar filtros de horário se especificado
     if time_filter_mode != "Todos os horários" and not df.empty:
@@ -166,52 +173,7 @@ def get_vehicle_list(client_filter=None):
         st.error(f"Erro ao carregar veículos: {str(e)}")
         return []
 
-def apply_filters_to_data(df, client_filter, vehicle_filter, start_date, end_date):
-    """Aplica filtros aos dados já carregados"""
-    try:
-        if df.empty:
-            return df
-            
-        filtered_df = df.copy()
-        
-        # Filtro de cliente
-        if client_filter and client_filter != "Todos":
-            filtered_df = filtered_df[filtered_df['cliente'] == client_filter]
-        
-        # Filtro de veículo  
-        if vehicle_filter and vehicle_filter != "Todos":
-            filtered_df = filtered_df[filtered_df['placa'] == vehicle_filter]
-        
-        # Filtro de data - com tratamento robusto de timezone
-        if 'data' in filtered_df.columns and not filtered_df.empty:
-            try:
-                # Garantir que a coluna data é datetime
-                if not pd.api.types.is_datetime64_any_dtype(filtered_df['data']):
-                    filtered_df['data'] = pd.to_datetime(filtered_df['data'], errors='coerce')
-                
-                # Criar datetimes para comparação
-                start_datetime = datetime.combine(start_date, datetime.min.time())
-                end_datetime = datetime.combine(end_date, datetime.max.time())
-                
-                # Se dados têm timezone, converter filtros também
-                if filtered_df['data'].dt.tz is not None:
-                    start_datetime = pd.Timestamp(start_datetime).tz_localize('UTC')
-                    end_datetime = pd.Timestamp(end_datetime).tz_localize('UTC')
-                
-                # Aplicar filtros de data
-                filtered_df = filtered_df[
-                    (filtered_df['data'] >= start_datetime) & 
-                    (filtered_df['data'] <= end_datetime)
-                ]
-            except Exception as date_error:
-                # Em caso de erro de datetime, não aplicar filtro de data
-                st.warning(f"Aviso: Erro no filtro de data - {str(date_error)}")
-                pass
-        
-        return filtered_df
-    except Exception as e:
-        st.error(f"Erro ao aplicar filtros: {str(e)}")
-        return pd.DataFrame()
+# Função removida - agora usando método centralizado DataAnalyzer.apply_filters()
 
 def load_filtered_data(client_filter, vehicle_filter, start_date, end_date):
     """Função mantida para compatibilidade - Carrega dados filtrados"""

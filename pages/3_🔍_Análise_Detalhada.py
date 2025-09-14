@@ -151,6 +151,11 @@ def show_overview_analysis(analyzer):
     
     kpis = analyzer.get_kpis()
     
+    # Verificar se há KPIs válidos
+    if not kpis:
+        st.warning("⚠️ Não foi possível calcular métricas. Verifique se há dados para os filtros aplicados.")
+        return
+    
     # Métricas principais
     col1, col2, col3, col4 = st.columns(4)
     
@@ -655,12 +660,14 @@ def show_temporal_patterns(analyzer):
         st.plotly_chart(fig_hourly_speed, use_container_width=True)
     
     # Padrões por dia da semana
+    # Definir mapeamento de dias para português (usado em múltiplos lugares)
+    dias_ordem = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    dias_pt = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+    
     if len(df['data'].dt.date.unique()) > 7:  # Mais de uma semana de dados
         st.subheader("📅 Padrões por Dia da Semana")
         
         df['dia_semana'] = df['data'].dt.day_name()
-        dias_ordem = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        dias_pt = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
         
         weekly_data = df.groupby('dia_semana').agg({
             'placa': 'nunique',

@@ -152,6 +152,11 @@ def show_executive_summary(insights, analyzer):
     
     kpis = analyzer.get_kpis()
     
+    # Verificar se há KPIs válidos
+    if not kpis:
+        st.warning("⚠️ Não foi possível calcular métricas para gerar insights. Verifique se há dados nos filtros aplicados.")
+        return
+    
     # KPIs principais com contexto
     col1, col2, col3, col4 = st.columns(4)
     

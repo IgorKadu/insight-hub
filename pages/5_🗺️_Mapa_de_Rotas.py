@@ -7,6 +7,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 from database.db_manager import DatabaseManager
+from utils.data_analyzer import DataAnalyzer
 import folium
 from streamlit_folium import st_folium
 
@@ -71,33 +72,26 @@ with st.sidebar:
         step=0.5
     )
 
-# Aplicar filtros
-filtered_df = df.copy()
-
-if selected_client != "Todos":
-    filtered_df = filtered_df[filtered_df['cliente'] == selected_client]
-
-if selected_vehicle != "Todos":
-    filtered_df = filtered_df[filtered_df['placa'] == selected_vehicle]
-
-# Filtro de data
-if 'data' in filtered_df.columns:
-    try:
-        if not pd.api.types.is_datetime64_any_dtype(filtered_df['data']):
-            filtered_df['data'] = pd.to_datetime(filtered_df['data'], errors='coerce')
-        
-        start_datetime = datetime.combine(start_date, datetime.min.time())
-        end_datetime = datetime.combine(end_date, datetime.max.time())
-        
-        filtered_df = filtered_df[
-            (filtered_df['data'] >= start_datetime) & 
-            (filtered_df['data'] <= end_datetime)
-        ]
-    except Exception:
-        pass
+# Aplicar filtros usando método centralizado do DataAnalyzer
+analyzer = DataAnalyzer(df)
+filtered_df = analyzer.apply_filters(
+    cliente=selected_client,
+    placa=selected_vehicle,
+    data_inicio=start_date,
+    data_fim=end_date
+)
 
 if filtered_df.empty:
     st.warning("⚠️ Nenhum dado encontrado para os filtros selecionados.")
+    
+    # Ajudar o usuário a entender o problema
+    st.info("💡 **Dicas para encontrar dados:**")
+    st.markdown("""
+    - ✅ Verifique se o **período de datas** corresponde aos dados disponíveis
+    - ✅ Experimente ampliar o **intervalo de datas** 
+    - ✅ Tente selecionar **"Todos"** para cliente ou veículo
+    - ✅ Use filtros mais amplos para ver dados disponíveis
+    """)
     st.stop()
 
 # Preparar dados para análise de rotas

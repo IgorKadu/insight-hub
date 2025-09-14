@@ -92,6 +92,11 @@ def main():
     # Obter KPIs
     kpis = analyzer.get_kpis()
     
+    # Verificar se há KPIs válidos
+    if not kpis:
+        st.warning("⚠️ Não foi possível calcular métricas com os filtros aplicados. Tente ajustar os filtros.")
+        st.stop()
+    
     # Mostrar métricas principais
     st.header("📈 Métricas Principais")
     
