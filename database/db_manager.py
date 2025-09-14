@@ -12,6 +12,52 @@ class DatabaseManager:
     """Manager to integrate database operations with existing workflow"""
     
     @staticmethod
+    def _extract_coordinates(row):
+        """Extract and validate latitude/longitude coordinates from various sources"""
+        # Try direct latitude/longitude columns first
+        lat = DatabaseManager._safe_float_convert(row.get('latitude') or row.get('Latitude'))
+        lon = DatabaseManager._safe_float_convert(row.get('longitude') or row.get('Longitude'))
+        
+        # If we have valid coordinates, use them
+        if lat != 0.0 and lon != 0.0 and -90 <= lat <= 90 and -180 <= lon <= 180:
+            return lat, lon
+        
+        # Try extracting from location field
+        location_field = row.get('localizacao') or row.get('Localização') or row.get('location') or row.get('Location')
+        if pd.notna(location_field):
+            try:
+                location = str(location_field).strip()
+                # Handle different coordinate formats
+                if ',' in location:
+                    # Remove any parentheses or extra characters
+                    location = location.replace('(', '').replace(')', '').strip()
+                    parts = location.split(',')
+                    if len(parts) == 2:
+                        lat_str = parts[0].strip()
+                        lon_str = parts[1].strip()
+                        
+                        # Handle Portuguese decimal comma format
+                        lat_str = lat_str.replace(',', '.')
+                        lon_str = lon_str.replace(',', '.')
+                        
+                        try:
+                            parsed_lat = float(lat_str)
+                            parsed_lon = float(lon_str)
+                            
+                            # Validate coordinate ranges
+                            if -90 <= parsed_lat <= 90 and -180 <= parsed_lon <= 180:
+                                # Reject clearly invalid coordinates like (0,0)
+                                if not (parsed_lat == 0.0 and parsed_lon == 0.0):
+                                    return parsed_lat, parsed_lon
+                        except ValueError:
+                            pass
+            except Exception:
+                pass
+        
+        # Return None for invalid/missing coordinates (will be stored as NULL in DB)
+        return None, None
+    
+    @staticmethod
     def _safe_int_convert(value):
         """Safely convert value to int, handling special cases"""
         if pd.isna(value) or value is None or str(value).strip() == '':
@@ -140,6 +186,9 @@ class DatabaseManager:
                 if pd.isna(placa_value) or placa_value is None or str(placa_value).strip() == '':
                     continue  # Skip records without plate
                 
+                # Extract and validate coordinates first
+                latitude, longitude = DatabaseManager._extract_coordinates(row)
+                
                 record = {
                     'cliente': str(cliente_name).strip(),
                     'placa': str(placa_value).strip(),
@@ -166,8 +215,8 @@ class DatabaseManager:
                     'imagem': row.get('imagem') or row.get('Imagem'),
                     'tensao': DatabaseManager._safe_float_convert(row.get('tensao') or row.get('Tensão')),
                     'bloqueado': DatabaseManager._safe_int_convert(row.get('bloqueado') or row.get('Bloqueado')),
-                    'latitude': DatabaseManager._safe_float_convert(row.get('latitude') or row.get('Latitude')),
-                    'longitude': DatabaseManager._safe_float_convert(row.get('longitude') or row.get('Longitude'))
+                    'latitude': latitude,
+                    'longitude': longitude
                 }
                 
                 records.append(record)
@@ -225,6 +274,9 @@ class DatabaseManager:
                 if pd.isna(placa_value) or placa_value is None or str(placa_value).strip() == '':
                     continue  # Skip records without plate
                 
+                # Extract and validate coordinates first
+                latitude, longitude = DatabaseManager._extract_coordinates(row)
+                
                 record = {
                     'cliente': str(cliente_name).strip(),
                     'placa': str(placa_value).strip(),
@@ -250,20 +302,10 @@ class DatabaseManager:
                     'bateria': row.get('bateria') or row.get('Bateria'),
                     'imagem': row.get('imagem') or row.get('Imagem'),
                     'tensao': DatabaseManager._safe_float_convert(row.get('tensao') or row.get('Tensão')),
-                    'bloqueado': DatabaseManager._safe_int_convert(row.get('bloqueado') or row.get('Bloqueado'))
+                    'bloqueado': DatabaseManager._safe_int_convert(row.get('bloqueado') or row.get('Bloqueado')),
+                    'latitude': latitude,
+                    'longitude': longitude
                 }
-                
-                # Add derived location data if available
-                location_field = row.get('localizacao') or row.get('Localização')
-                if pd.notna(location_field):
-                    try:
-                        location = str(location_field)
-                        if ',' in location:
-                            lat_str, lon_str = location.split(',')
-                            record['latitude'] = float(lat_str.strip())
-                            record['longitude'] = float(lon_str.strip())
-                    except:
-                        pass
                 
                 records.append(record)
             
