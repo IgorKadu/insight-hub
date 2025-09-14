@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from database.db_manager import DatabaseManager
 
 # Configuração da página
 st.set_page_config(
@@ -34,17 +35,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def load_processed_data():
-    """Carrega dados processados se existirem"""
-    data_file = "data/processed_data.csv"
-    if os.path.exists(data_file):
-        try:
-            df = pd.read_csv(data_file)
-            df['data'] = pd.to_datetime(df['data'])
-            return df
-        except Exception as e:
-            st.error(f"Erro ao carregar dados: {str(e)}")
+    """Carrega dados da base PostgreSQL"""
+    try:
+        if not DatabaseManager.has_data():
             return pd.DataFrame()
-    return pd.DataFrame()
+        
+        df = DatabaseManager.get_dashboard_data()
+        if not df.empty:
+            return df
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao carregar dados da base: {str(e)}")
+        return pd.DataFrame()
 
 def main():
     # Header principal
@@ -66,11 +68,15 @@ def main():
             st.markdown("""
             ### 🎯 **Funcionalidades Principais**
             
-            - **📊 Dashboard Interativo**: KPIs em tempo real
+            - **📊 Análise Profissional**: KPIs em tempo real  
             - **📁 Upload de CSV**: Processamento de dados telemáticos
             - **🔍 Análise Detalhada**: Filtros avançados por cliente e período
             - **📈 Comparação de Veículos**: Análise comparativa de performance
+            - **🔧 Manutenção Preditiva**: Alertas e previsões
+            - **🚨 Alertas**: Monitoramento em tempo real
             - **🧠 Insights Automáticos**: Geração inteligente de relatórios
+            - **📄 Relatórios Avançados**: Documentação completa
+            - **🚨 Controle Operacional**: Conformidade municipal
             """)
         
         with col2:
@@ -78,13 +84,14 @@ def main():
             ### 📋 **Campos Obrigatórios do CSV**
             
             - Cliente, Placa, Ativo, Data, Data (GPRS)
-            - Velocidade (Km), Ignição, Motorista
-            - GPS, Gprs, Localização, Endereço
+            - Velocidade (Km/h), Ignição, Motorista
+            - GPS, GPRS, Localização, Endereço
             - Tipo do Evento, Cerca, Saída, Entrada
             - Pacote, Odômetro do período (Km)
             - Horímetro do período, Horímetro embarcado
-            - Odômetro embarcado (Km), Bateria
-            - Imagem, Tensão, Bloqueado
+            - Odômetro embarcado (Km), Bateria (%)
+            - Imagem, Tensão (V), Bloqueado
+            - Latitude, Longitude (coordenadas GPS)
             """)
         
         st.markdown("---")
