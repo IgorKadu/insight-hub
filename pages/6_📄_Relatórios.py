@@ -84,6 +84,13 @@ if df is None or df.empty:
     st.error("❌ Não foi possível carregar os dados para o relatório.")
     st.stop()
 
+# Validar colunas essenciais
+required_columns = ['data', 'placa', 'cliente', 'velocidade_km', 'gps']
+missing_columns = [col for col in required_columns if col not in df.columns]
+if missing_columns:
+    st.error(f"❌ Colunas essenciais ausentes nos dados: {', '.join(missing_columns)}")
+    st.stop()
+
 # Filtrar dados por período se especificado - com validação de tipo
 df_filtered = df.copy()
 
@@ -123,6 +130,20 @@ def show_report_preview(df, summary, analyzer, tipo_relatorio):
     """Mostra pré-visualização do relatório"""
     st.subheader("👁️ Pré-visualização do Relatório")
     
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para o período selecionado.")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("📊 Total de Registros", "0")
+        with col2:
+            st.metric("🚗 Veículos", "0")
+        with col3:
+            st.metric("🏢 Clientes", "0")
+        with col4:
+            st.metric("📅 Período", "0 dias")
+        return
+    
     # Estatísticas gerais
     col1, col2, col3, col4 = st.columns(4)
     
@@ -133,7 +154,14 @@ def show_report_preview(df, summary, analyzer, tipo_relatorio):
     with col3:
         st.metric("🏢 Clientes", f"{df['cliente'].nunique()}")
     with col4:
-        st.metric("📅 Período", f"{(df['data'].max() - df['data'].min()).days} dias")
+        # Calcular período de forma segura
+        try:
+            periodo_dias = (df['data'].max() - df['data'].min()).days
+            if pd.isna(periodo_dias):
+                periodo_dias = 0
+        except:
+            periodo_dias = 0
+        st.metric("📅 Período", f"{periodo_dias} dias")
     
     # Conteúdo baseado no tipo de relatório
     if "Executivo" in tipo_relatorio:
@@ -153,6 +181,11 @@ def show_executive_preview(df, summary, analyzer):
     """Preview do relatório executivo"""
     st.markdown("### 📋 Resumo Executivo")
     
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para o resumo executivo.")
+        return
+    
     # KPIs principais
     col1, col2, col3 = st.columns(3)
     
@@ -161,11 +194,11 @@ def show_executive_preview(df, summary, analyzer):
         st.metric("⚡ Velocidade Média", f"{velocidade_media:.1f} km/h")
         
     with col2:
-        gps_coverage = (df['gps'].sum() / len(df)) * 100
+        gps_coverage = (df['gps'].sum() / len(df)) * 100 if len(df) > 0 else 0
         st.metric("📡 Cobertura GPS", f"{gps_coverage:.1f}%")
         
     with col3:
-        utilizacao = len(df[df['velocidade_km'] > 0]) / len(df) * 100
+        utilizacao = len(df[df['velocidade_km'] > 0]) / len(df) * 100 if len(df) > 0 else 0
         st.metric("🚗 Taxa de Utilização", f"{utilizacao:.1f}%")
     
     # Gráfico de utilização por veículo
@@ -183,11 +216,21 @@ def show_vehicle_preview(df, analyzer):
     """Preview da análise por veículo"""
     st.markdown("### 🚗 Análise por Veículo")
     
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para análise por veículo.")
+        return
+    
     # Seleção de veículo
     veiculos = sorted(df['placa'].unique())
     veiculo_selecionado = st.selectbox("Selecione um veículo:", veiculos)
     
     df_veiculo = df[df['placa'] == veiculo_selecionado]
+    
+    # Verificar se há dados para o veículo selecionado
+    if df_veiculo.empty:
+        st.warning(f"⚠️ Nenhum dado encontrado para o veículo {veiculo_selecionado}.")
+        return
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -200,7 +243,7 @@ def show_vehicle_preview(df, analyzer):
         vel_max = df_veiculo['velocidade_km'].max()
         st.metric("🏎️ Velocidade Máxima", f"{vel_max:.1f} km/h")
     with col4:
-        utilizacao = len(df_veiculo[df_veiculo['velocidade_km'] > 0]) / len(df_veiculo) * 100
+        utilizacao = len(df_veiculo[df_veiculo['velocidade_km'] > 0]) / len(df_veiculo) * 100 if len(df_veiculo) > 0 else 0
         st.metric("📈 Utilização", f"{utilizacao:.1f}%")
     
     # Gráfico de velocidade ao longo do tempo
@@ -212,6 +255,11 @@ def show_vehicle_preview(df, analyzer):
 def show_performance_preview(df, analyzer):
     """Preview do relatório de performance"""
     st.markdown("### ⚡ Análise de Performance")
+    
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para análise de performance.")
+        return
     
     # Top performers
     performance = df.groupby('placa').agg({
@@ -244,6 +292,11 @@ def show_compliance_preview(df, analyzer):
     """Preview do relatório de conformidade"""
     st.markdown("### 🚨 Análise de Conformidade")
     
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para análise de conformidade.")
+        return
+    
     # Análise de velocidade
     excesso_velocidade = df[df['velocidade_km'] > 80]
     violacoes_criticas = df[df['velocidade_km'] > 100]
@@ -255,7 +308,7 @@ def show_compliance_preview(df, analyzer):
     with col2:
         st.metric("🚨 Violações Críticas", len(violacoes_criticas))
     with col3:
-        conformidade = (1 - len(excesso_velocidade) / len(df)) * 100
+        conformidade = (1 - len(excesso_velocidade) / len(df)) * 100 if len(df) > 0 else 100
         st.metric("✅ Taxa de Conformidade", f"{conformidade:.1f}%")
     
     if len(excesso_velocidade) > 0:
@@ -270,6 +323,11 @@ def show_compliance_preview(df, analyzer):
 def show_trends_preview(df, analyzer):
     """Preview da análise de tendências"""
     st.markdown("### 📈 Análise de Tendências")
+    
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para análise de tendências.")
+        return
     
     # Tendências por dia
     df['dia'] = df['data'].dt.date
@@ -300,6 +358,11 @@ def show_report_dashboard(df, analyzer):
     """Dashboard interativo do relatório"""
     st.subheader("📊 Dashboard Interativo")
     
+    # Verificar se há dados
+    if df.empty:
+        st.warning("⚠️ Nenhum dado disponível para o dashboard.")
+        return
+    
     # Filtros interativos
     col1, col2, col3 = st.columns(3)
     
@@ -311,10 +374,28 @@ def show_report_dashboard(df, analyzer):
         )
     
     with col2:
-        data_inicio = st.date_input("📅 Data Início:", value=df['data'].min().date())
+        # Tratamento seguro para datas
+        try:
+            min_date = df['data'].min()
+            if pd.isna(min_date):
+                min_date = datetime.now().date() - timedelta(days=30)
+            else:
+                min_date = min_date.date()
+            data_inicio = st.date_input("📅 Data Início:", value=min_date)
+        except:
+            data_inicio = st.date_input("📅 Data Início:", value=datetime.now().date() - timedelta(days=30))
     
     with col3:
-        data_fim = st.date_input("📅 Data Fim:", value=df['data'].max().date())
+        # Tratamento seguro para datas
+        try:
+            max_date = df['data'].max()
+            if pd.isna(max_date):
+                max_date = datetime.now().date()
+            else:
+                max_date = max_date.date()
+            data_fim = st.date_input("📅 Data Fim:", value=max_date)
+        except:
+            data_fim = st.date_input("📅 Data Fim:", value=datetime.now().date())
     
     # Filtrar dados
     df_filtered = df[
