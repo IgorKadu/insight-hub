@@ -90,10 +90,30 @@ def main():
             st.error("❌ Arquivo muito grande! Tamanho máximo: 50MB")
             st.stop()
         
-        # Preview do arquivo
+        # Preview do arquivo com detecção automática de encoding
         try:
-            # Ler as primeiras linhas para preview
-            preview_df = pd.read_csv(uploaded_file, nrows=5)
+            # Tentar diferentes encodings e separadores para preview
+            preview_df = None
+            separators = [';', ',']
+            encodings = ['latin-1', 'utf-8', 'iso-8859-1', 'windows-1252', 'cp1252']
+            
+            for sep in separators:
+                for enc in encodings:
+                    try:
+                        uploaded_file.seek(0)
+                        preview_df = pd.read_csv(uploaded_file, sep=sep, encoding=enc, nrows=5)
+                        # Se chegou até aqui, deu certo
+                        st.success(f"📄 Arquivo detectado: separador '{sep}', encoding '{enc}'")
+                        break
+                    except:
+                        continue
+                if preview_df is not None:
+                    break
+            
+            # Se não conseguiu com nenhuma combinação, tentar leitura padrão
+            if preview_df is None:
+                uploaded_file.seek(0)
+                preview_df = pd.read_csv(uploaded_file, nrows=5)
             
             with col2:
                 st.success(f"""
