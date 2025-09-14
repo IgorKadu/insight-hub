@@ -13,22 +13,48 @@ class PDFReportGenerator:
         self.pdf = FPDF()
         self.pdf.set_auto_page_break(auto=True, margin=15)
         
-        # Tentar adicionar fonte Unicode (DejaVu Sans)
-        try:
-            font_path = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts', 'DejaVuSans.ttf')
-            if os.path.exists(font_path):
-                self.pdf.add_font('DejaVu', '', font_path, uni=True)
+        # Carregamento resiliente de fontes Unicode (DejaVu Sans)
+        font_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts')
+        font_regular = os.path.join(font_dir, 'DejaVuSans.ttf')
+        font_bold = os.path.join(font_dir, 'DejaVuSans-Bold.ttf')
+        font_italic = os.path.join(font_dir, 'DejaVuSans-Oblique.ttf')
+        
+        self.available_styles = []
+        self.unicode_font_available = False
+        
+        # Tentar carregar fonte regular
+        if os.path.exists(font_regular):
+            try:
+                self.pdf.add_font('DejaVu', '', font_regular, uni=True)
+                self.available_styles.append('')
                 self.unicode_font_available = True
                 self.default_font = 'DejaVu'
-            else:
-                self.unicode_font_available = False
-                self.default_font = 'Arial'
-        except:
-            self.unicode_font_available = False
+            except Exception as e:
+                print(f'Warning: Could not load DejaVu regular font: {e}')
+        
+        # Tentar carregar fonte Bold independentemente
+        if os.path.exists(font_bold):
+            try:
+                self.pdf.add_font('DejaVu', 'B', font_bold, uni=True)
+                self.available_styles.append('B')
+            except Exception as e:
+                print(f'Warning: Could not load DejaVu bold font: {e}')
+        
+        # Tentar carregar fonte Italic independentemente
+        if os.path.exists(font_italic):
+            try:
+                self.pdf.add_font('DejaVu', 'I', font_italic, uni=True)
+                self.available_styles.append('I')
+            except Exception as e:
+                print(f'Warning: Could not load DejaVu italic font: {e}')
+        
+        # Fallback para Arial se DejaVu não funcionou
+        if not self.unicode_font_available:
             self.default_font = 'Arial'
+            print('Warning: Using Arial fallback - Portuguese accents may be degraded')
         
         self.pdf.add_page()
-        self.pdf.set_font(self.default_font, 'B', 16)
+        self._safe_set_font(self.default_font, 'B', 16)
     
     def strip_emojis(self, text: str) -> str:
         """Remove emojis e caracteres especiais do texto"""
@@ -71,6 +97,58 @@ class PDFReportGenerator:
         
         return text
     
+    def _safe_makedirs(self, output_path: str) -> None:
+        """Cria diretório apenas se necessário, evitando erro com arquivo sem diretório"""
+        output_dir = os.path.dirname(output_path)
+        if output_dir:  # Só criar se há diretório no caminho
+            os.makedirs(output_dir, exist_ok=True)
+    
+    def _safe_set_font(self, family: str, style: str = '', size: int = 12) -> None:
+        """Define fonte de forma segura, fazendo fallback se o estilo não estiver disponível"""
+        if self.unicode_font_available and family == 'DejaVu':
+            # Verificar se o estilo está disponível
+            if style in self.available_styles:
+                self.pdf.set_font(family, style, size)
+            else:
+                # Fallback para estilo regular se o solicitado não estiver disponível
+                fallback_style = '' if '' in self.available_styles else 'B' if 'B' in self.available_styles else ''
+                self.pdf.set_font(family, fallback_style, size)
+        else:
+            # Usar Arial com estilos padrão
+            self.pdf.set_font(family, style, size)
+    
+    def _force_ascii_text(self, text: str) -> str:
+        """Força conversão para ASCII seguro para tratamento de erros"""
+        if not text:
+            return ""
+        
+        text = self.strip_emojis(str(text))
+        
+        # Mapeamento rigoroso para ASCII
+        char_map = {
+            'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a', 'ä': 'a',
+            'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+            'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+            'ó': 'o', 'ò': 'o', 'õ': 'o', 'ô': 'o', 'ö': 'o',
+            'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+            'ç': 'c', 'ñ': 'n',
+            'Á': 'A', 'À': 'A', 'Ã': 'A', 'Â': 'A', 'Ä': 'A',
+            'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E',
+            'Í': 'I', 'Ì': 'I', 'Î': 'I', 'Ï': 'I',
+            'Ó': 'O', 'Ò': 'O', 'Õ': 'O', 'Ô': 'O', 'Ö': 'O',
+            'Ú': 'U', 'Ù': 'U', 'Û': 'U', 'Ü': 'U',
+            'Ç': 'C', 'Ñ': 'N'
+        }
+        
+        # Substituir caracteres especiais
+        for char, replacement in char_map.items():
+            text = text.replace(char, replacement)
+        
+        # Forçar remoção de qualquer caractere não ASCII
+        text = ''.join(c if ord(c) < 128 else '?' for c in text)
+        
+        return text
+    
     def safe_text(self, text: str) -> str:
         """Converte texto para formato seguro para PDF"""
         if not text:
@@ -78,40 +156,63 @@ class PDFReportGenerator:
         
         text = self.strip_emojis(str(text))
         
-        # Se fonte Unicode não disponível, converter caracteres especiais
-        if not self.unicode_font_available:
-            text = text.encode('latin-1', 'replace').decode('latin-1')
+        # Se temos fonte Unicode, manter caracteres portugueses
+        if self.unicode_font_available:
+            return text
+        
+        # Fallback: Mapeamento de caracteres especiais portugueses para ASCII
+        char_map = {
+            'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a', 'ä': 'a',
+            'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+            'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+            'ó': 'o', 'ò': 'o', 'õ': 'o', 'ô': 'o', 'ö': 'o',
+            'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+            'ç': 'c', 'ñ': 'n',
+            'Á': 'A', 'À': 'A', 'Ã': 'A', 'Â': 'A', 'Ä': 'A',
+            'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E',
+            'Í': 'I', 'Ì': 'I', 'Î': 'I', 'Ï': 'I',
+            'Ó': 'O', 'Ò': 'O', 'Õ': 'O', 'Ô': 'O', 'Ö': 'O',
+            'Ú': 'U', 'Ù': 'U', 'Û': 'U', 'Ü': 'U',
+            'Ç': 'C', 'Ñ': 'N'
+        }
+        
+        # Substituir caracteres especiais apenas se fonte Unicode não disponível
+        for char, replacement in char_map.items():
+            text = text.replace(char, replacement)
+        
+        # Remover qualquer caractere não ASCII restante
+        text = ''.join(c if ord(c) < 128 else '?' for c in text)
         
         return text
     
     def add_header(self, title: str):
         """Adiciona cabeçalho da seção"""
         self.pdf.set_fill_color(230, 230, 230)
-        self.pdf.set_font(self.default_font, 'B', 14)
+        self._safe_set_font(self.default_font, 'B', 14)
         safe_title = self.safe_text(title)
         self.pdf.cell(0, 10, safe_title, 0, 1, 'L', True)
         self.pdf.ln(5)
     
     def add_subsection(self, title: str):
         """Adiciona subtítulo"""
-        self.pdf.set_font(self.default_font, 'B', 12)
+        self._safe_set_font(self.default_font, 'B', 12)
         safe_title = self.safe_text(title)
         self.pdf.cell(0, 8, safe_title, 0, 1, 'L')
         self.pdf.ln(3)
     
     def add_metric(self, label: str, value: str, unit: str = ""):
         """Adiciona métrica formatada"""
-        self.pdf.set_font(self.default_font, '', 10)
+        self._safe_set_font(self.default_font, '', 10)
         safe_label = self.safe_text(label)
         self.pdf.cell(100, 6, f'{safe_label}:', 0, 0, 'L')
-        self.pdf.set_font(self.default_font, 'B', 10)
+        self._safe_set_font(self.default_font, 'B', 10)
         safe_value = self.safe_text(str(value))
         safe_unit = self.safe_text(unit)
         self.pdf.cell(0, 6, f'{safe_value} {safe_unit}', 0, 1, 'L')
     
     def add_table_header(self, headers: List[str]):
         """Adiciona cabeçalho de tabela"""
-        self.pdf.set_font(self.default_font, 'B', 9)
+        self._safe_set_font(self.default_font, 'B', 9)
         self.pdf.set_fill_color(200, 200, 200)
         col_width = 190 / len(headers)
         for header in headers:
@@ -121,7 +222,7 @@ class PDFReportGenerator:
     
     def add_table_row(self, data: List[str]):
         """Adiciona linha de tabela"""
-        self.pdf.set_font(self.default_font, '', 8)
+        self._safe_set_font(self.default_font, '', 8)
         col_width = 190 / len(data)
         for item in data:
             safe_item = self.safe_text(str(item))
@@ -145,30 +246,33 @@ class PDFReportGenerator:
     def _add_safe_text(self, font: str, style: str, size: int, text: str, 
                       align: str = 'L', height: int = 6, border: int = 0) -> None:
         """Adiciona texto de forma segura ao PDF"""
-        self.pdf.set_font(font, style, size)
+        self._safe_set_font(font, style, size)
         safe_text = self.safe_text(text)
         self.pdf.cell(0, height, safe_text, border, 1, align)
     
     def _generate_error_pdf(self, error_message: str) -> Dict[str, Any]:
         """Gera PDF de erro padronizado"""
         try:
-            error_buffer = BytesIO()
             error_pdf = FPDF()
             error_pdf.add_page()
             error_pdf.set_font('Arial', 'B', 16)
             error_pdf.cell(0, 10, 'ERRO NA GERACAO DO RELATORIO', 0, 1, 'C')
             error_pdf.ln(10)
             error_pdf.set_font('Arial', '', 12)
-            error_pdf.cell(0, 10, error_message[:100], 0, 1, 'C')
-            error_pdf.output(error_buffer)
+            safe_error = self.safe_text(error_message[:100])
+            error_pdf.cell(0, 10, safe_error, 0, 1, 'C')
+            
+            # Gerar PDF de forma consistente
+            error_output = error_pdf.output(dest='S')
+            error_bytes = error_output.encode('latin-1') if isinstance(error_output, str) else error_output
             
             return {
                 'success': False,
                 'error': error_message,
-                'pdf_bytes': error_buffer.getvalue(),
+                'pdf_bytes': error_bytes,
                 'filename': 'relatorio_erro.pdf'
             }
-        except:
+        except Exception as e:
             return {
                 'success': False,
                 'error': error_message,
@@ -295,27 +399,27 @@ class PDFReportGenerator:
                 if maintenance_alerts:
                     self.add_subsection('Alertas de Manutenção Preditiva:')
                     for alert in maintenance_alerts[:5]:  # Top 5 alertas
-                        self.pdf.set_font('Arial', '', 9)
-                        alert_text = f"• {alert.get('vehicle', 'N/A')}: {alert.get('message', 'Alerta detectado')}"
-                        self.pdf.cell(0, 5, alert_text[:90], 0, 1)  # Truncar se muito longo
+                        self._safe_set_font(self.default_font, '', 9)
+                        alert_text = f"- {alert.get('vehicle', 'N/A')}: {alert.get('message', 'Alerta detectado')}"
+                        self.pdf.cell(0, 5, self.safe_text(alert_text[:90]), 0, 1)
                         
                 # Recomendações de manutenção
                 recommendations = predictive_results.get('recommendations', [])
                 if recommendations:
                     self.add_subsection('Recomendações de Ação:')
                     for rec in recommendations[:3]:  # Top 3 recomendações
-                        self.pdf.set_font('Arial', '', 9)
-                        self.pdf.cell(0, 5, f"• {rec}"[:80], 0, 1)
+                        self._safe_set_font(self.default_font, '', 9)
+                        self.pdf.cell(0, 5, self.safe_text(f"- {rec}"[:80]), 0, 1)
             else:
-                self.pdf.set_font('Arial', '', 10)
-                self.pdf.cell(0, 6, 'Dados insuficientes para análise preditiva (mínimo 50 registros)', 0, 1)
+                self._safe_set_font(self.default_font, '', 10)
+                self.pdf.cell(0, 6, self.safe_text('Dados insuficientes para análise preditiva (mínimo 50 registros)'), 0, 1)
             
             self.pdf.ln(5)
             
             # 3. ANÁLISE POR CLIENTE
             self.add_header('3. ANÁLISE POR CLIENTE')
             
-            client_stats = df.groupby('cliente').agg({
+            client_stats = filtered_df.groupby('cliente').agg({
                 'placa': 'nunique',
                 'velocidade_km': ['mean', 'max'],
                 'odometro_periodo_km': 'sum'
@@ -337,8 +441,8 @@ class PDFReportGenerator:
             self.add_header('4. ANÁLISE GEOGRÁFICA E PADRÕES DE ROTA')
             
             # Análise geográfica baseada em coordenadas
-            if 'latitude' in df.columns and 'longitude' in df.columns:
-                valid_coords = df.dropna(subset=['latitude', 'longitude'])
+            if 'latitude' in filtered_df.columns and 'longitude' in filtered_df.columns:
+                valid_coords = filtered_df.dropna(subset=['latitude', 'longitude'])
                 valid_coords = valid_coords[(valid_coords['latitude'] != 0) & (valid_coords['longitude'] != 0)]
                 
                 if not valid_coords.empty:
@@ -363,18 +467,18 @@ class PDFReportGenerator:
                         self.add_metric('Picos de Velocidade Geo-referenciados', f'{len(speed_violations):,}')
                         self.add_metric('Percentual de Violações', f'{len(speed_violations)/len(valid_coords)*100:.1f}%')
                 else:
-                    self.pdf.set_font('Arial', '', 10)
-                    self.pdf.cell(0, 6, 'Coordenadas GPS não disponíveis para análise geográfica', 0, 1)
+                    self._safe_set_font(self.default_font, '', 10)
+                    self.pdf.cell(0, 6, self.safe_text('Coordenadas GPS não disponíveis para análise geográfica'), 0, 1)
             else:
-                self.pdf.set_font('Arial', '', 10)
-                self.pdf.cell(0, 6, 'Dados de localização não encontrados', 0, 1)
+                self._safe_set_font(self.default_font, '', 10)
+                self.pdf.cell(0, 6, self.safe_text('Dados de localização não encontrados'), 0, 1)
             
             self.pdf.ln(5)
             
             # 5. ANÁLISE DETALHADA POR VEÍCULO
             self.add_header('5. ANÁLISE DETALHADA POR VEÍCULO')
             
-            vehicle_stats = df.groupby(['cliente', 'placa']).agg({
+            vehicle_stats = filtered_df.groupby(['cliente', 'placa']).agg({
                 'velocidade_km': ['mean', 'max', 'std'],
                 'odometro_periodo_km': 'sum',
                 'data': 'count'
@@ -464,13 +568,13 @@ class PDFReportGenerator:
             self.add_header('5. ANÁLISE OPERACIONAL')
             
             # Rodapé
-            self.pdf.set_font(self.default_font, 'I', 8)
+            self._safe_set_font(self.default_font, 'I', 8)
             footer_text = f'Relatorio gerado em {datetime.now().strftime("%d/%m/%Y as %H:%M:%S")} - Insight Hub Fleet Monitor'
             self.pdf.cell(0, 6, self.safe_text(footer_text), 0, 1, 'C')
             
-            # Gerar PDF como bytes
-            buffer = BytesIO()
-            self.pdf.output(buffer)
+            # Gerar PDF como bytes de forma segura
+            pdf_output = self.pdf.output(dest='S')  # Retorna string
+            pdf_bytes = pdf_output.encode('latin-1') if isinstance(pdf_output, str) else pdf_output
             
             # Gerar nome do arquivo
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -478,7 +582,7 @@ class PDFReportGenerator:
             
             return {
                 'success': True,
-                'pdf_bytes': buffer.getvalue(),
+                'pdf_bytes': pdf_bytes,
                 'filename': filename,
                 'total_records': total_records,
                 'total_vehicles': total_vehicles,
@@ -486,28 +590,32 @@ class PDFReportGenerator:
             }
             
         except Exception as e:
-            # Em caso de erro, retornar PDF de erro
+            # Em caso de erro, retornar PDF de erro com encoding seguro
             try:
-                error_buffer = BytesIO()
                 error_pdf = FPDF()
                 error_pdf.add_page()
                 error_pdf.set_font('Arial', 'B', 16)
                 error_pdf.cell(0, 10, 'ERRO NA GERACAO DO RELATORIO', 0, 1, 'C')
                 error_pdf.ln(10)
                 error_pdf.set_font('Arial', '', 12)
-                error_pdf.cell(0, 10, f'Erro: {str(e)[:100]}', 0, 1, 'C')
-                error_pdf.output(error_buffer)
+                # Sanitizar mensagem de erro
+                error_msg = self.safe_text(str(e)[:100])
+                error_pdf.cell(0, 10, f'Erro: {error_msg}', 0, 1, 'C')
+                
+                # Gerar PDF de erro de forma segura
+                error_output = error_pdf.output(dest='S')
+                error_bytes = error_output.encode('latin-1') if isinstance(error_output, str) else error_output
                 
                 return {
                     'success': False,
                     'error': str(e),
-                    'pdf_bytes': error_buffer.getvalue(),
+                    'pdf_bytes': error_bytes,
                     'filename': 'relatorio_erro.pdf'
                 }
-            except:
+            except Exception as inner_e:
                 return {
                     'success': False,
-                    'error': str(e),
+                    'error': f'Erro critico na geracao: {str(e)}. Erro interno: {str(inner_e)}',
                     'pdf_bytes': b'',
                     'filename': 'relatorio_erro.pdf'
                 }
@@ -521,9 +629,14 @@ class PDFReportGenerator:
             df = DatabaseManager.get_dashboard_data()
             
             if df.empty:
-                self.pdf.set_font(self.default_font, '', 12)
-                self.pdf.cell(0, 10, 'Nenhum dado disponivel para gerar relatorio', 0, 1, 'C')
-                self.pdf.output(output_path)
+                self._safe_set_font(self.default_font, '', 12)
+                self.pdf.cell(0, 10, self.safe_text('Nenhum dado disponivel para gerar relatorio'), 0, 1, 'C')
+                # Usar output consistente
+                pdf_output = self.pdf.output(dest='S')
+                pdf_bytes = pdf_output.encode('latin-1') if isinstance(pdf_output, str) else pdf_output
+                self._safe_makedirs(output_path)
+                with open(output_path, 'wb') as f:
+                    f.write(pdf_bytes)
                 return output_path
             
             # Criar contextos vazios para o método principal
@@ -541,7 +654,7 @@ class PDFReportGenerator:
             
             if result['success']:
                 # Salvar arquivo
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                self._safe_makedirs(output_path)
                 with open(output_path, 'wb') as f:
                     f.write(result['pdf_bytes'])
                 return output_path
@@ -552,30 +665,38 @@ class PDFReportGenerator:
                 self.pdf.ln(10)
                 
                 self.pdf.set_font(self.default_font, '', 12)
-                self.pdf.cell(0, 8, f'Data: {datetime.now().strftime("%d/%m/%Y")}', 0, 1)
-                self.pdf.cell(0, 8, f'Total de registros: {len(df):,}', 0, 1)
+                self.pdf.cell(0, 8, self.safe_text(f'Data: {datetime.now().strftime("%d/%m/%Y")}'), 0, 1)
+                self.pdf.cell(0, 8, self.safe_text(f'Total de registros: {len(df):,}'), 0, 1)
                 self._add_safe_text(self.default_font, '', 12, f'Veiculos: {df["placa"].nunique() if "placa" in df.columns else 0}', height=8)
                 self._add_safe_text(self.default_font, '', 12, f'Clientes: {df["cliente"].nunique() if "cliente" in df.columns else 0}', height=8)
                 
                 if 'velocidade_km' in df.columns:
                     self._add_safe_text(self.default_font, '', 12, f'Velocidade media: {df["velocidade_km"].mean():.1f} km/h', height=8)
                 
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                self.pdf.output(output_path)
+                # Usar output consistente
+                pdf_output = self.pdf.output(dest='S')
+                pdf_bytes = pdf_output.encode('latin-1') if isinstance(pdf_output, str) else pdf_output
+                self._safe_makedirs(output_path)
+                with open(output_path, 'wb') as f:
+                    f.write(pdf_bytes)
                 return output_path
             
         except Exception as e:
             # Relatório de erro mínimo
             try:
-                self.pdf.set_font('Arial', 'B', 14)
-                self.pdf.cell(0, 10, 'ERRO NO RELATORIO', 0, 1, 'C')
+                self.pdf.set_font(self.default_font, 'B', 14)
+                self.pdf.cell(0, 10, self.safe_text('ERRO NO RELATORIO'), 0, 1, 'C')
                 self.pdf.ln(5)
-                self.pdf.set_font('Arial', '', 10)
-                error_msg = f'Erro: {str(e)[:50]}'
+                self._safe_set_font(self.default_font, '', 10)
+                error_msg = self.safe_text(f'Erro: {str(e)[:50]}')
                 self.pdf.cell(0, 8, error_msg, 0, 1)
                 
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                self.pdf.output(output_path)
+                # Usar output consistente
+                pdf_output = self.pdf.output(dest='S')
+                pdf_bytes = pdf_output.encode('latin-1') if isinstance(pdf_output, str) else pdf_output
+                self._safe_makedirs(output_path)
+                with open(output_path, 'wb') as f:
+                    f.write(pdf_bytes)
                 return output_path
             except:
                 # Último recurso - criar arquivo vazio
